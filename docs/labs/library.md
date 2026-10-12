@@ -5,9 +5,32 @@ This is an independent runtime application: `library/books` owns catalog copies,
 ## Data definitions
 
 ```ts
-type Book = { title: string; author: string; isbn: string; copiesTotal: number; copiesAvailable?: number }
-type Member = { name: string; email: string; active?: boolean }
-type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }
+type Book = {
+  /** @exensial.title en Title */
+  title: string;
+  author: string;
+  isbn: string;
+  /** @exensial.ui.control number */
+  copiesTotal: number;
+  /** @exensial.title en Available copies */
+  /** @exensial.ui.control number */
+  copiesAvailable?: number;
+}
+type Member = { name: string; /** @exensial.ui.control email */ email: string; active?: boolean }
+type Loan = {
+  /** @exensial.relation library/books label=title */
+  bookId: string;
+  /** @exensial.relation library/members label=name */
+  memberId: string;
+  /** @exensial.ui.control datetime */
+  borrowedAt: string;
+  /** @exensial.ui.control datetime */
+  dueAt: string;
+  /** @exensial.ui.control datetime */
+  returnedAt?: string;
+  /** @exensial.ui.hidden */
+  status?: string;
+}
 ```
 
 ## Circulation policy

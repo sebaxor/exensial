@@ -1,4 +1,4 @@
-import type { Documentation, FieldDefinition, ScalarType } from "./entity";
+import type { Documentation, FieldDefinition, FieldUi, ScalarType, UiControl } from "./entity";
 
 /** Parses the deliberately small TypeScript type-alias subset supported by Exensial. */
 export function parseEntitySource(source: string): { typeName: string; fields: Record<string, FieldDefinition>; documentation?: Documentation } {
@@ -16,7 +16,8 @@ export function parseEntitySource(source: string): { typeName: string; fields: R
     fields[name] = {
       type: type as ScalarType,
       required: !optional,
-      documentation: parseDocumentation(fieldComment)
+      documentation: parseDocumentation(fieldComment),
+      ui: parseUi(fieldComment)
     };
     cursor = (fieldMatch.index ?? 0) + declaration.length;
   }
@@ -66,6 +67,26 @@ function parseDocumentation(comment?: string): Documentation | undefined {
     documentation[key]![locale] = text.trim();
   }
   return Object.keys(documentation).length ? documentation : undefined;
+}
+
+/** Extracts UI hints from JSDoc without making the schema depend on the HTML console. */
+function parseUi(comment?: string): FieldUi | undefined {
+  if (!comment) return undefined;
+  const lines = comment.split("\n").map((line) => line.replace(/^\s*\*?\s*/, "").trim());
+  const ui: FieldUi = {};
+  if (lines.some((line) => line === "@exensial.ui.hidden")) ui.hidden = true;
+  const control = lines.map((line) => line.match(/^@exensial\.ui\.control\s+(\w+)$/)).find(Boolean)?.[1];
+  if (control) {
+    const allowed: UiControl[] = ["text", "textarea", "email", "date", "datetime", "number", "money", "checkbox"];
+    if (!allowed.includes(control as UiControl)) throw new ValidationError(`Unsupported UI control: ${control}`);
+    ui.control = control as UiControl;
+  }
+  const relation = lines.map((line) => line.match(/^@exensial\.relation\s+([\w.-]+)(?:\/([\w-]+))?(?:\s+label=(\w+))?$/)).find(Boolean);
+  if (relation) {
+    const [, first, second, label] = relation;
+    ui.relation = second ? { namespace: first, entity: second, ...(label ? { label } : {}) } : { entity: first, ...(label ? { label } : {}) };
+  }
+  return Object.keys(ui).length ? ui : undefined;
 }
 
 export class ValidationError extends Error {}

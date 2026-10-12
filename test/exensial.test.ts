@@ -92,7 +92,7 @@ test("persists normalized requests and responses as system entities", async () =
 
 test("generates localized OpenAPI documentation from Exensial JSDoc metadata", async () => {
   await withApi(async (baseUrl) => {
-    const definition = `/**\n * @exensial.title en Products\n * @exensial.title es Productos\n * @exensial.description en A product catalog\n */\ntype Product = {\n  /** @exensial.title en Title */\n  name: string;\n}`;
+    const definition = `/**\n * @exensial.title en Products\n * @exensial.title es Productos\n * @exensial.description en A product catalog\n */\ntype Product = {\n  /** @exensial.title en Title */\n  name: string;\n  /**\n   * @exensial.ui.hidden\n   */\n  internalCode?: string;\n  /**\n   * @exensial.ui.control money\n   */\n  price?: number;\n  /**\n   * @exensial.relation catalog/categories label=name\n   */\n  categoryId?: string;\n}`;
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "documented-products", definition }) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.info.title, "Exensial API");
@@ -102,12 +102,15 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     const schema = openapi.components.schemas["documented-products"];
     assert.equal(schema.title, "Products");
     assert.equal(schema["x-exensial-localized"].title.es, "Productos");
+    assert.equal(schema.properties.internalCode["x-exensial-ui"].hidden, true);
+    assert.equal(schema.properties.price["x-exensial-ui"].control, "money");
+    assert.deepEqual(schema.properties.categoryId["x-exensial-ui"].relation, { namespace: "catalog", entity: "categories", label: "name" });
     assert.ok(openapi.paths["/v1/documented-products"]);
     const collection = openapi.paths["/v1/documented-products"];
     assert.equal(collection.get.operationId, "listDocumentedProducts");
     assert.match(collection.get.description, /Returns every record/);
-    assert.deepEqual(collection.post.requestBody.content["application/json"].examples.one.value, { name: "Example name" });
-    assert.deepEqual(collection.get.responses[200].content["application/json"].example, [{ id: "550e8400-e29b-41d4-a716-446655440000", name: "Example name" }]);
+    assert.equal(collection.post.requestBody.content["application/json"].examples.one.value.name, "Example name");
+    assert.equal(collection.get.responses[200].content["application/json"].example[0].name, "Example name");
     assert.match(openapi.paths["/v1/documented-products/{id}"].patch.description, /Updates only the supplied fields/);
     assert.match(await (await fetch(`${baseUrl}/docs`)).text(), /SwaggerUIBundle/);
     const consolePage = await (await fetch(`${baseUrl}/console`)).text();

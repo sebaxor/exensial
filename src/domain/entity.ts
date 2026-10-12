@@ -7,10 +7,19 @@ export interface Documentation {
   description?: LocalizedText;
 }
 
+export type UiControl = "text" | "textarea" | "email" | "date" | "datetime" | "number" | "money" | "checkbox";
+
+export interface FieldUi {
+  hidden?: boolean;
+  control?: UiControl;
+  relation?: { entity: string; namespace?: string; label?: string };
+}
+
 export interface FieldDefinition {
   type: ScalarType;
   required: boolean;
   documentation?: Documentation;
+  ui?: FieldUi;
 }
 
 export interface EntityDefinition {

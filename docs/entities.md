@@ -89,6 +89,31 @@ type Task = {
 
 OpenAPI uses the English text, when present, in standard `title` and `description` properties. It preserves every locale in `x-exensial-localized`, so a UI can select its own language without parsing the source again.
 
+## UI metadata and relations
+
+Field JSDoc can also declare presentation hints. Exensial exports them under the vendor extension `x-exensial-ui` in OpenAPI; consumers that do not understand the extension can safely ignore it.
+
+```ts
+type Loan = {
+  /** @exensial.relation library/books label=title */
+  bookId: string;
+  /** @exensial.relation library/members label=name */
+  memberId: string;
+  /** @exensial.ui.control datetime */
+  borrowedAt: string;
+  /** @exensial.ui.hidden */
+  internalState?: string;
+  /** @exensial.ui.control money */
+  lateFee?: number;
+}
+```
+
+- `@exensial.ui.hidden` hides a field from generic consoles and tables. The record still contains it and the REST API remains unchanged.
+- `@exensial.ui.control text|textarea|email|date|datetime|number|money|checkbox` selects a suitable editor. `email`, `date`, and `datetime` also use the standard OpenAPI `format` where applicable.
+- `@exensial.relation <entity>` or `@exensial.relation <namespace>/<entity> label=<field>` declares a record relationship. The generic console reads the target collection and renders a selector using `label`, then `name`, `title`, `email`, or `id`.
+
+The generated `id` is hidden by default in the Exensial console but is retained internally for item routes and relationship values.
+
 ## Runtime business logic
 
 `logic` is a high-level, declarative business definition sent to `POST /v1/entities` with the schema. It is installed immediately for that entity. It is not JavaScript and has no HTTP, repository, or middleware details: it describes validations, record lookups, field assignments, and patches to related entities.

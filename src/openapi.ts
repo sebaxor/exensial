@@ -37,10 +37,19 @@ function entitySchema(definition: EntityDefinition): Schema {
 function fieldSchema(field: FieldDefinition): Schema {
   return {
     ...scalarSchema(field.type),
+    ...uiFormat(field.ui?.control),
     title: text(field.documentation?.title),
     description: text(field.documentation?.description),
-    "x-exensial-localized": field.documentation
+    "x-exensial-localized": field.documentation,
+    "x-exensial-ui": field.ui
   };
+}
+
+function uiFormat(control?: string): Schema {
+  if (control === "email") return { format: "email" };
+  if (control === "date") return { format: "date" };
+  if (control === "datetime") return { format: "date-time" };
+  return {};
 }
 
 function scalarSchema(type: ScalarType): Schema {
