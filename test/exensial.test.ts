@@ -232,79 +232,28 @@ test("allows equal entity names in separate namespaces", async () => {
   });
 });
 
-test("installs availability reservation rules through runtime logic", async () => {
+test("applies generic declarative rules without domain-specific inventory behavior", async () => {
   await withApi(async (baseUrl) => {
     const post = (path: string, body: unknown) => fetch(`${baseUrl}${path}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
     });
     await post("/v1/entities", {
-      name: "books", namespace: "library",
-      definition: "type Book = { title: string; copiesTotal: number; copiesAvailable?: number }",
+      name: "notes",
+      definition: "type Note = { title: string; slug?: string }",
       logic: {
         create: { before: [
           { type: "normalize", fields: ["title"] },
-          { type: "validate", required: ["title"], positiveIntegers: ["copiesTotal"] },
-          { type: "copy", from: "copiesTotal", to: "copiesAvailable" }
+          { type: "validate", required: ["title"] },
+          { type: "copy", from: "title", to: "slug" }
         ] }
       }
     });
-    const book = await (await post("/v1/library/books", { title: "  A Wizard of Earthsea  ", copiesTotal: 1 })).json();
-    assert.equal(book.title, "A Wizard of Earthsea");
-    assert.equal(book.copiesAvailable, 1);
-    const imported = await post("/v1/library/books", [{ title: "  Tehanu  ", copiesTotal: 2 }]);
+    const note = await (await post("/v1/notes", { title: "  Runtime rules  " })).json();
+    assert.deepEqual({ title: note.title, slug: note.slug }, { title: "Runtime rules", slug: "Runtime rules" });
+    const imported = await post("/v1/notes", [{ title: "  First  " }, { title: " Second " }]);
     assert.equal(imported.status, 201);
-    const importedBook = (await imported.json()).items[0];
-    assert.equal(importedBook.title, "Tehanu");
-    assert.equal(importedBook.copiesAvailable, 2);
-    assert.ok(importedBook.id);
-    const loanDefinition = await post("/v1/entities", {
-      name: "loans",
-      namespace: "library",
-      logic: {
-        create: {
-          before: [
-            { type: "normalize", fields: ["memberId"] },
-            { type: "validate", required: ["bookId", "memberId", "borrowedAt", "dueAt"], isoDates: ["borrowedAt", "dueAt"], dateOrder: { earlier: "borrowedAt", later: "dueAt" } },
-            { type: "set", field: "status", value: "active" },
-            { type: "reserve", entityName: "books", namespace: "library", idField: "bookId", field: "copiesAvailable" }
-          ]
-        },
-        update: {
-          before: [
-            { type: "transition", field: "status", from: "active", to: "returned", required: ["returnedAt"], isoDates: ["returnedAt"] }
-          ],
-          after: [{ type: "release", entityName: "books", namespace: "library", idSource: "current", idField: "bookId", field: "copiesAvailable", capacityField: "copiesTotal" }]
-        },
-        bulkCreate: { before: [{ type: "reject", message: "Bulk loans are not allowed" }] },
-        delete: { before: [{ type: "assert", source: "current", field: "status", rule: "notEquals", value: "active", message: "Active loans cannot be deleted" }] }
-      },
-      definition: "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }"
-    });
-    assert.equal(loanDefinition.status, 201);
-
-    assert.equal((await post("/v1/library/loans", {
-      bookId: book.id, memberId: " ", borrowedAt: "2026-10-12T10:00:00.000Z", dueAt: "2026-10-26T10:00:00.000Z"
-    })).status, 400);
-    const created = await post("/v1/library/loans", {
-      bookId: book.id, memberId: "member-1", borrowedAt: "2026-10-12T10:00:00.000Z", dueAt: "2026-10-26T10:00:00.000Z"
-    });
-    const loan = await created.json();
-    assert.equal(created.status, 201);
-    assert.equal(loan.status, "active");
-    assert.equal((await (await fetch(`${baseUrl}/v1/library/books/${book.id}`)).json()).copiesAvailable, 0);
-
-    assert.equal((await post("/v1/library/loans", {
-      bookId: book.id, memberId: "member-2", borrowedAt: "2026-10-12T10:00:00.000Z", dueAt: "2026-10-26T10:00:00.000Z"
-    })).status, 400);
-    assert.equal((await fetch(`${baseUrl}/v1/library/loans/${loan.id}`, {
-      method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: "returned", returnedAt: "2026-10-15T12:00:00.000Z" })
-    })).status, 200);
-    assert.equal((await (await fetch(`${baseUrl}/v1/library/books/${book.id}`)).json()).copiesAvailable, 1);
-    assert.equal((await fetch(`${baseUrl}/v1/library/loans/${loan.id}`, {
-      method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: "returned", returnedAt: "2026-10-15T12:00:00.000Z" })
-    })).status, 400);
+    const items = (await imported.json()).items;
+    assert.deepEqual(items.map((item: { title: string; slug: string }) => [item.title, item.slug]), [["First", "First"], ["Second", "Second"]]);
   });
 });
 

@@ -87,9 +87,6 @@ async function runRule(rule: Rule, context: EntityOperationContext, state: RuleS
   if (type === "copy") return copyRule(rule, context);
   if (type === "normalize") return normalizeRule(rule, context);
   if (type === "validate") return validateRule(rule, context);
-  if (type === "transition") return transitionRule(rule, context);
-  if (type === "reserve") return reserveRule(rule, context, state);
-  if (type === "release") return releaseRule(rule, context);
   if (type === "patch") return patchRule(rule, context, state);
   if (type === "reject") throw new ValidationError(requiredString(rule.message, "rule.message"));
   throw new ValidationError(`Unsupported logic rule: ${type}`);
@@ -167,43 +164,6 @@ function validateRule(rule: Rule, context: EntityOperationContext): void {
   }
 }
 
-function transitionRule(rule: Rule, context: EntityOperationContext): void {
-  const input = inputRecord(context);
-  const current = context.current;
-  if (!current) throw new ValidationError("transition rules require the current record");
-  const field = requiredString(rule.field, "transition.field");
-  const from = rule.from;
-  const to = rule.to;
-  if (current[field] !== from || input[field] !== to) throw new ValidationError(optionalString(rule.message) ?? `Invalid ${field} transition`);
-  for (const required of optionalStringList(rule.required, "transition.required")) {
-    if (typeof input[required] !== "string" || !input[required].trim()) throw new ValidationError(`${required} is required`);
-  }
-  for (const fieldName of optionalStringList(rule.isoDates, "transition.isoDates")) {
-    if (typeof input[fieldName] !== "string" || !Number.isFinite(Date.parse(input[fieldName]))) throw new ValidationError(`${fieldName} must be an ISO-8601 date-time`);
-  }
-}
-
-async function reserveRule(rule: Rule, context: EntityOperationContext, state: RuleState): Promise<void> {
-  const resource = resourceRule(rule, context, "reserve");
-  const amount = positiveAmount(rule.amount);
-  const available = resource.record[resource.field];
-  if (!Number.isInteger(available) || Number(available) < amount) throw new ValidationError(optionalString(rule.message) ?? "Referenced resource has no available copies");
-  await patchResource(context, resource, Number(available) - amount);
-  state.compensations.push(() => patchResource(context, resource, Number(available)));
-}
-
-async function releaseRule(rule: Rule, context: EntityOperationContext): Promise<void> {
-  const resource = resourceRule(rule, context, "release");
-  const amount = positiveAmount(rule.amount);
-  const available = resource.record[resource.field];
-  if (!Number.isInteger(available)) throw new ValidationError(`${resource.field} must be an integer`);
-  const next = Number(available) + amount;
-  const capacityField = optionalString(rule.capacityField);
-  if (capacityField && (!Number.isInteger(resource.record[capacityField]) || next > Number(resource.record[capacityField]))) {
-    throw new ValidationError(`${resource.field} cannot exceed ${capacityField}`);
-  }
-  await patchResource(context, resource, next);
-}
 
 async function patchRule(rule: Rule, context: EntityOperationContext, state: RuleState): Promise<void> {
   const entityName = requiredString(rule.entityName, "patch.entityName");
@@ -220,34 +180,6 @@ async function patchRule(rule: Rule, context: EntityOperationContext, state: Rul
   });
 }
 
-function resourceRule(
-  rule: Rule,
-  context: EntityOperationContext,
-  name: string
-): { entityName: string; namespace?: string; id: string; field: string; record: Record<string, unknown> & { id: string } } {
-  const entityName = requiredString(rule.entityName, `${name}.entityName`);
-  const field = requiredString(rule.field, `${name}.field`);
-  const id = sourceRecord(rule.idSource, context, { lookups: new Map(), compensations: [] })[requiredString(rule.idField, `${name}.idField`)];
-  if (typeof id !== "string" || !id) throw new ValidationError(`${name} target id is required`);
-  const record = context.runtime.findRecord(entityName, id, optionalString(rule.namespace));
-  if (!record) throw new ValidationError(`${name} target does not exist`);
-  return { entityName, namespace: optionalString(rule.namespace), id, field, record };
-}
-
-async function patchResource(
-  context: EntityOperationContext,
-  resource: { entityName: string; namespace?: string; id: string; field: string },
-  value: number
-): Promise<void> {
-  await context.runtime.execute({
-    apiVersion: context.request.apiVersion,
-    namespace: resource.namespace,
-    entityName: resource.entityName,
-    action: "update",
-    id: resource.id,
-    payload: { kind: "one", value: { [resource.field]: value } }
-  });
-}
 
 function inputRecord(context: EntityOperationContext): Record<string, unknown> {
   if (!context.input || Array.isArray(context.input)) throw new ValidationError("Rule requires a single create or update input");
@@ -261,12 +193,6 @@ function stringList(value: unknown, name: string): string[] {
 
 function optionalStringList(value: unknown, name: string): string[] {
   return value === undefined ? [] : stringList(value, name);
-}
-
-function positiveAmount(value: unknown): number {
-  if (value === undefined) return 1;
-  if (!Number.isInteger(value) || Number(value) < 1) throw new ValidationError("amount must be a positive integer");
-  return Number(value);
 }
 
 function unsupportedNormalization(mode: string): never {

@@ -110,10 +110,8 @@ The supported rule types are:
 - `normalize`: trim text and optionally normalize its case.
 - `validate`: apply grouped required, date, and positive-integer checks.
 - `copy`: derive one input field from another.
-- `reserve` and `release`: decrement or increment an integer inventory field.
-- `transition`: allow one explicit state change and require its transition data.
 
-For a compact, complete runtime example with copies and loans, see the [library circulation lab](labs/library.md). It presents the domain definition first and the installation curls separately.
+For a complete runtime example with copies and loans, see the [library circulation lab](labs/library.md). Inventory and loan-state rules belong in that lab's runtime code, not in Exensial's generic rule vocabulary.
 
 ## Runtime TypeScript domain code
 
@@ -130,7 +128,7 @@ export default {
 
 The context provides `records.get/create/update/remove` for other entities and `fail(message)` for a business rejection. It does not expose HTTP requests, responses, repositories, filesystem, or database drivers. This keeps domain source independent from the current in-memory repository. Read [runtime TypeScript domain modules](runtime-code.md) for the full contract and development-only security limitation.
 
-The following is a deliberately explicit, low-level example built from `lookup`, `assert`, and `patch`. It remains useful when a domain needs custom composition. The [library circulation lab](labs/library.md) uses the compact `reserve`, `release`, and `transition` vocabulary instead.
+The following is a deliberately explicit, low-level example built from `lookup`, `assert`, and `patch`. It remains useful for declarative relationships. Domain workflows such as circulation should use runtime TypeScript code instead.
 
 ```json
 {
@@ -171,7 +169,7 @@ The following is a deliberately explicit, low-level example built from `lookup`,
 }
 ```
 
-On create, this logic validates the DTO, looks up the book, rejects an unavailable book, writes `status: "active"`, and marks the book unavailable. On return, it accepts only an active loan with `status: "returned"` and a valid `returnedAt`, then releases the book after the loan update succeeds. Prefer the compact lab definition for a copy-aware library implementation.
+On create, this logic validates the DTO, looks up the book, writes `status: "active"`, and patches a related record. It demonstrates generic composition only; a copy-aware circulation policy belongs in a runtime TypeScript domain module.
 
 ## Disabling the catalog
 

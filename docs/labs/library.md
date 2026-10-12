@@ -1,151 +1,70 @@
 # Library circulation runtime lab
 
-This lab installs a small library application entirely through Exensial's REST API. It has three entities:
+This is an independent runtime application: `library/books` owns catalog copies, `library/members` owns membership, and `library/loans` owns circulation. Exensial provides generic CRUD and a neutral collection facade; every rule about copies, members, and loans is installed as library code through `POST /v1/entities`.
 
-- `library/books`: catalog entries with total and currently available copies.
-- `library/members`: library members.
-- `library/loans`: a loan of one copy to one member.
+## Data definitions
 
-The reusable runtime contains no knowledge of books or loans. Everything below is runtime data stored in the `entities` catalog.
-
-## Two executable forms
-
-The definitions below use Exensial's compact declarative `logic` vocabulary. They are the portable form of the lab and the curls in the appendices install them without application source code.
-
-The same domain can instead be supplied as a TypeScript `code` module in the entity request. The running local demonstration uses that form: its book and member modules normalize records (including bulk imports), while its loan module validates dates and active members, reserves a book copy, compensates a failed creation, releases a returned copy, and rejects deletion of an active loan. The module uses only `context.input`, `context.current`, `context.records`, `context.fail`, and `next`; it has no HTTP or repository dependency. See [runtime TypeScript domain modules](../runtime-code.md) for the complete executable contract and a loan module example.
-
-## Domain definitions
-
-### Books
-
-```json
-{
-  "name": "books",
-  "namespace": "library",
-  "definition": "type Book = { title: string; author: string; isbn: string; copiesTotal: number; copiesAvailable?: number }",
-  "logic": {
-    "create": {
-      "before": [
-        { "type": "normalize", "fields": ["title", "author", "isbn"] },
-        { "type": "normalize", "mode": "upper", "fields": ["isbn"] },
-        { "type": "validate", "required": ["title", "author", "isbn"], "positiveIntegers": ["copiesTotal"] },
-        { "type": "copy", "from": "copiesTotal", "to": "copiesAvailable" }
-      ]
-    }
-  }
-}
+```ts
+type Book = { title: string; author: string; isbn: string; copiesTotal: number; copiesAvailable?: number }
+type Member = { name: string; email: string; active?: boolean }
+type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }
 ```
 
-Business meaning: titles, authors, and ISBNs are trimmed; ISBNs are uppercased; a book needs at least one total copy; the available-copy count starts equal to the total-copy count. The caller does not set `copiesAvailable` during creation.
+## Circulation policy
 
-### Members
+The book module trims bibliographic data, initializes availability, and prevents a total below borrowed copies. The member module normalizes identity data and activates new members. Both explicitly implement `create`, `bulkCreate`, and `update`, because import is a business operation.
 
-```json
-{
-  "name": "members",
-  "namespace": "library",
-  "definition": "type Member = { name: string; email: string; active?: boolean }",
-  "logic": {
-    "create": {
-      "before": [
-        { "type": "normalize", "fields": ["name", "email"] },
-        { "type": "normalize", "mode": "lower", "fields": ["email"] },
-        { "type": "validate", "required": ["name", "email"] },
-        { "type": "set", "field": "active", "value": true }
-      ]
-    }
-  }
-}
+The loan module speaks library language. `collection` is only the persistence-neutral boundary; it can later become a table repository and transaction without changing this policy.
+
+```ts
+const isDate = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
+
+export default {
+  create: async (context, next) => {
+    const loan = context.input;
+    const books = context.collection("books", "library");
+    const members = context.collection("members", "library");
+    const member = members.get(String(loan.memberId));
+    const book = books.get(String(loan.bookId));
+    if (!member?.active) context.fail("Member is not active");
+    if (!book || Number(book.copiesAvailable) < 1) context.fail("Book is not available");
+    if (!isDate(loan.borrowedAt) || !isDate(loan.dueAt) || Date.parse(loan.dueAt) <= Date.parse(loan.borrowedAt)) context.fail("A later valid dueAt is required");
+
+    await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) - 1 });
+    try { loan.status = "active"; await next(); }
+    catch (error) { await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) }); throw error; }
+  },
+  update: async (context, next) => {
+    const loan = context.current;
+    const change = context.input;
+    if (loan.status !== "active" || change.status !== "returned" || !isDate(change.returnedAt)) context.fail("Only an active loan with returnedAt may be returned");
+    await next();
+    const books = context.collection("books", "library");
+    const book = books.get(String(loan.bookId));
+    await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) + 1 });
+  },
+  delete: async (context, next) => { if (context.current.status === "active") context.fail("Active loans cannot be deleted"); await next(); },
+  bulkCreate: async (context) => context.fail("Bulk loans are not allowed")
+};
 ```
 
-Business meaning: member data is normalized and every new member starts active.
+## Expected behavior
 
-### Loans
+- A new book begins with all copies available.
+- A loan requires an active member, an available book, and a valid future due date.
+- Creating a loan reserves one copy; a failed create restores it.
+- Returning an active loan releases one copy; active loans cannot be deleted.
 
-```json
-{
-  "name": "loans",
-  "namespace": "library",
-  "definition": "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }",
-  "logic": {
-    "create": {
-      "before": [
-        { "type": "normalize", "fields": ["memberId"] },
-        { "type": "validate", "required": ["bookId", "memberId", "borrowedAt", "dueAt"], "isoDates": ["borrowedAt", "dueAt"], "dateOrder": { "earlier": "borrowedAt", "later": "dueAt" } },
-        { "type": "set", "field": "status", "value": "active" },
-        { "type": "reserve", "entityName": "books", "namespace": "library", "idField": "bookId", "field": "copiesAvailable" }
-      ]
-    },
-    "update": {
-      "before": [
-        { "type": "transition", "field": "status", "from": "active", "to": "returned", "required": ["returnedAt"], "isoDates": ["returnedAt"] }
-      ],
-      "after": [
-        { "type": "release", "entityName": "books", "namespace": "library", "idSource": "current", "idField": "bookId", "field": "copiesAvailable", "capacityField": "copiesTotal" }
-      ]
-    },
-    "bulkCreate": { "before": [{ "type": "reject", "message": "Bulk loans are not allowed" }] },
-    "delete": { "before": [{ "type": "assert", "source": "current", "field": "status", "rule": "notEquals", "value": "active", "message": "Active loans cannot be deleted" }] }
-  }
-}
-```
+## Appendix: curls
 
-Business meaning:
-
-- A loan needs a book, member, valid borrow date, and later due date.
-- Creating a loan sets `status` to `active` and reserves one available copy. No copy means no loan.
-- Returning a loan is the only accepted loan update. It requires `returnedAt`, changes the status to `returned`, and releases one copy.
-- Active loans cannot be deleted and loan imports are rejected.
-
-## Rule vocabulary used by this lab
-
-| Rule | Domain intention |
-| --- | --- |
-| `normalize` | Trim text and optionally change case. |
-| `validate` | Require fields, validate dates, and apply simple numeric constraints. |
-| `copy` | Derive one input field from another. |
-| `set` | Set a business state owned by the workflow. |
-| `reserve` | Decrement an integer availability field; reject when no copy remains. |
-| `transition` | Allow one explicit state change and require return data. |
-| `release` | Increment availability without exceeding total capacity. |
-
-## Appendix A: runtime installation curls
-
-Run these commands against an empty service. The definitions are the same domain declarations shown above.
+The entity endpoint receives the TypeScript module as its JSON `code` string. The local service is already loaded with the complete book, member, and loan modules described above.
 
 ```bash
-curl -X POST http://localhost:3000/v1/entities \
-  -H 'content-type: application/json' \
-  -d '{"name":"books","namespace":"library","definition":"type Book = { title: string; author: string; isbn: string; copiesTotal: number; copiesAvailable?: number }","logic":{"create":{"before":[{"type":"normalize","fields":["title","author","isbn"]},{"type":"normalize","mode":"upper","fields":["isbn"]},{"type":"validate","required":["title","author","isbn"],"positiveIntegers":["copiesTotal"]},{"type":"copy","from":"copiesTotal","to":"copiesAvailable"}]}}}'
-```
+curl http://localhost:3000/v1/entities
+curl http://localhost:3000/v1/library/books
+curl http://localhost:3000/v1/library/members
+curl http://localhost:3000/v1/library/loans
 
-```bash
-curl -X POST http://localhost:3000/v1/entities \
-  -H 'content-type: application/json' \
-  -d '{"name":"members","namespace":"library","definition":"type Member = { name: string; email: string; active?: boolean }","logic":{"create":{"before":[{"type":"normalize","fields":["name","email"]},{"type":"normalize","mode":"lower","fields":["email"]},{"type":"validate","required":["name","email"]},{"type":"set","field":"active","value":true}]}}}'
-```
-
-```bash
-curl -X POST http://localhost:3000/v1/entities \
-  -H 'content-type: application/json' \
-  -d '{"name":"loans","namespace":"library","definition":"type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }","logic":{"create":{"before":[{"type":"normalize","fields":["memberId"]},{"type":"validate","required":["bookId","memberId","borrowedAt","dueAt"],"isoDates":["borrowedAt","dueAt"],"dateOrder":{"earlier":"borrowedAt","later":"dueAt"}},{"type":"set","field":"status","value":"active"},{"type":"reserve","entityName":"books","namespace":"library","idField":"bookId","field":"copiesAvailable"}]},"update":{"before":[{"type":"transition","field":"status","from":"active","to":"returned","required":["returnedAt"],"isoDates":["returnedAt"]}],"after":[{"type":"release","entityName":"books","namespace":"library","idSource":"current","idField":"bookId","field":"copiesAvailable","capacityField":"copiesTotal"}]},"bulkCreate":{"before":[{"type":"reject","message":"Bulk loans are not allowed"}]},"delete":{"before":[{"type":"assert","source":"current","field":"status","rule":"notEquals","value":"active","message":"Active loans cannot be deleted"}]}}}'
-```
-
-## Appendix B: sample scenario curls
-
-```bash
-curl -X POST http://localhost:3000/v1/library/books \
-  -H 'content-type: application/json' \
-  -d '{"title":"  The Left Hand of Darkness  ","author":" Ursula K. Le Guin ","isbn":"978-0441478125","copiesTotal":2}'
-
-curl -X POST http://localhost:3000/v1/library/members \
-  -H 'content-type: application/json' \
-  -d '{"name":"  Ana Torres  ","email":" ANA.TORRES@EXAMPLE.COM "}'
-```
-
-Use the `id` values returned by those commands:
-
-```bash
 curl -X POST http://localhost:3000/v1/library/loans \
   -H 'content-type: application/json' \
   -d '{"bookId":"<book-id>","memberId":"<member-id>","borrowedAt":"2026-10-12T10:00:00.000Z","dueAt":"2026-10-26T10:00:00.000Z"}'
@@ -155,11 +74,4 @@ curl -X PATCH http://localhost:3000/v1/library/loans/<loan-id> \
   -d '{"status":"returned","returnedAt":"2026-10-20T15:30:00.000Z"}'
 ```
 
-Inspect the installed definitions and the resulting application with:
-
-```bash
-curl http://localhost:3000/v1/entities
-curl http://localhost:3000/v1/library/books
-curl http://localhost:3000/v1/library/members
-curl http://localhost:3000/v1/library/loans
-```
+See [runtime TypeScript domain modules](../runtime-code.md) for the exact `code` installation contract.

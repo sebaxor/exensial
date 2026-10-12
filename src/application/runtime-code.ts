@@ -22,6 +22,12 @@ export interface BusinessContext {
     update(entityName: string, id: string, changes: Record<string, unknown>, namespace?: string): Promise<EntityRecord>;
     remove(entityName: string, id: string, namespace?: string): Promise<void>;
   };
+  collection(entityName: string, namespace?: string): {
+    get(id: string): EntityRecord | undefined;
+    create(value: Record<string, unknown>): Promise<EntityRecord>;
+    update(id: string, changes: Record<string, unknown>): Promise<EntityRecord>;
+    remove(id: string): Promise<void>;
+  };
   fail(message: string): never;
 }
 
@@ -81,18 +87,25 @@ function businessContext(context: EntityOperationContext): BusinessContext {
     payload: value === undefined ? undefined : { kind: "one", value }
   });
 
+  const records = {
+    get: (entityName: string, id: string, namespace?: string) => context.runtime.findRecord(entityName, id, namespace),
+    create: async (entityName: string, value: Record<string, unknown>, namespace?: string) => requiredRecord(await execute("create", entityName, namespace, undefined, value)),
+    update: async (entityName: string, id: string, changes: Record<string, unknown>, namespace?: string) => requiredRecord(await execute("update", entityName, namespace, id, changes)),
+    remove: async (entityName: string, id: string, namespace?: string) => { await execute("delete", entityName, namespace, id); }
+  };
   return {
     get action() { return context.request.action; },
     get input() { return context.input; },
     get current() { return context.current; },
     get result() { return context.result; },
     set result(value) { context.result = value; },
-    records: {
-      get: (entityName, id, namespace) => context.runtime.findRecord(entityName, id, namespace),
-      create: async (entityName, value, namespace) => requiredRecord(await execute("create", entityName, namespace, undefined, value)),
-      update: async (entityName, id, changes, namespace) => requiredRecord(await execute("update", entityName, namespace, id, changes)),
-      remove: async (entityName, id, namespace) => { await execute("delete", entityName, namespace, id); }
-    },
+    records,
+    collection: (entityName, namespace) => ({
+      get: (id) => records.get(entityName, id, namespace),
+      create: (value) => records.create(entityName, value, namespace),
+      update: (id, changes) => records.update(entityName, id, changes, namespace),
+      remove: (id) => records.remove(entityName, id, namespace)
+    }),
     fail(message) { throw new ValidationError(message); }
   };
 }

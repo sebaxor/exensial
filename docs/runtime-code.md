@@ -32,11 +32,17 @@ type BusinessContext = {
     update(entityName: string, id: string, changes: Record<string, unknown>, namespace?: string): Promise<Record<string, unknown>>;
     remove(entityName: string, id: string, namespace?: string): Promise<void>;
   };
+  collection(entityName: string, namespace?: string): {
+    get(id: string): Record<string, unknown> | undefined;
+    create(value: Record<string, unknown>): Promise<Record<string, unknown>>;
+    update(id: string, changes: Record<string, unknown>): Promise<Record<string, unknown>>;
+    remove(id: string): Promise<void>;
+  };
   fail(message: string): never;
 };
 ```
 
-`input` is mutable before `next()`, allowing normalization and derived fields. `current` is the persisted record for item operations. `records` performs domain-level CRUD against another installed entity; it does not reveal its implementation. This is the seam that will later map to a table repository, a transaction, an event stream, or another persistence mechanism.
+`input` is mutable before `next()`, allowing normalization and derived fields. `current` is the persisted record for item operations. `collection("books", "library")` is the readable shorthand for working with one related collection; `records` is the equivalent lower-level form. Neither reveals persistence implementation. This is the seam that will later map to a table repository, a transaction, an event stream, or another persistence mechanism.
 
 ## Example: copy-aware loans
 
@@ -47,10 +53,11 @@ export default {
   create: async (context, next) => {
     const loan = context.input as Record<string, unknown>;
     loan.memberId = String(loan.memberId).trim().toLowerCase();
-    const book = context.records.get("books", String(loan.bookId), "library");
+    const books = context.collection("books", "library");
+    const book = books.get(String(loan.bookId));
     if (!book || Number(book.copiesAvailable) < 1) context.fail("Book is not available");
 
-    await context.records.update("books", book.id, { copiesAvailable: Number(book.copiesAvailable) - 1 }, "library");
+    await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) - 1 });
     loan.status = "active";
     await next();
   },
@@ -59,8 +66,9 @@ export default {
     const change = context.input as Record<string, unknown>;
     if (context.current?.status !== "active" || change.status !== "returned") context.fail("Only active loans may be returned");
     await next();
-    const book = context.records.get("books", String(context.current?.bookId), "library")!;
-    await context.records.update("books", book.id, { copiesAvailable: Number(book.copiesAvailable) + 1 }, "library");
+    const books = context.collection("books", "library");
+    const book = books.get(String(context.current?.bookId))!;
+    await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) + 1 });
   }
 };
 ```
