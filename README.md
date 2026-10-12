@@ -41,4 +41,6 @@ Cada request REST reconocido y cada resultado se conservan, respectivamente, com
 
 La especificación dinámica está en `/openapi.json` y la interfaz Swagger está en `/docs`.
 
+El catálogo de entidades puede desactivarse al iniciar: `EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start`. En ese modo, `/v1/entities` no está disponible y solo quedan los módulos instalados explícitamente por la aplicación.
+
 Consulta [la arquitectura y las decisiones técnicas](docs/architecture.md) para el diseño completo.

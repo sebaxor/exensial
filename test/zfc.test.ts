@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { createApp } from "../src/app";
+import type { AppOptions } from "../src/app";
+import type { EntityBehaviorModule } from "../src/application/entity-behaviors";
 
-async function withApi(run: (baseUrl: string) => Promise<void>) {
-  const server = createServer(createApp());
+async function withApi(run: (baseUrl: string) => Promise<void>, options: AppOptions = {}) {
+  const server = createServer(createApp(options));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Could not start server");
@@ -91,4 +93,44 @@ test("generates localized OpenAPI documentation from JSDoc entity metadata", asy
     assert.ok(openapi.paths["/v1/documented-products"]);
     assert.match(await (await fetch(`${baseUrl}/docs`)).text(), /SwaggerUIBundle/);
   });
+});
+
+test("binds trusted operation middleware to a runtime-defined entity", async () => {
+  const normalizeTitle: EntityBehaviorModule = {
+    id: "example/normalize-title",
+    operations: {
+      create: async (context, next) => {
+        const input = context.input as Record<string, unknown>;
+        input.title = String(input.title).trim().toUpperCase();
+        await next();
+      }
+    }
+  };
+  await withApi(async (baseUrl) => {
+    const entity = await fetch(`${baseUrl}/v1/entities`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "announcements",
+        namespace: "demo.content",
+        module: "example/normalize-title",
+        definition: "type Announcement = { title: string }"
+      })
+    });
+    assert.equal(entity.status, 201);
+    const created = await fetch(`${baseUrl}/v1/announcements`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "  hello  " })
+    });
+    assert.equal((await created.json()).title, "HELLO");
+
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.deepEqual(openapi.components.schemas.announcements["x-exensial-context"], {
+      namespace: "demo.content", module: "example/normalize-title", operations: ["create"]
+    });
+  }, { behaviorModules: [normalizeTitle] });
+});
+
+test("can disable the entity catalog layer", async () => {
+  await withApi(async (baseUrl) => {
+    assert.equal((await fetch(`${baseUrl}/v1/entities`)).status, 404);
+  }, { enableEntityCatalog: false });
 });

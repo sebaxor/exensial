@@ -24,6 +24,7 @@ function entitySchema(definition: EntityDefinition): Schema {
     title: text(definition.documentation?.title) ?? definition.name,
     description: text(definition.documentation?.description),
     "x-zfc-localized": definition.documentation,
+    "x-exensial-context": definition.context,
     properties,
     required: ["id", ...Object.entries(definition.fields).filter(([, field]) => field.required).map(([name]) => name)]
   };

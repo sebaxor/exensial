@@ -60,6 +60,51 @@ La interfaz `Repository` es el límite de persistencia. Hoy la implementación e
 
 De este modo las definiciones también viven en su propio repositorio y se consultan con `GET /v1/entities`.
 
+### Catálogo activable
+
+Al iniciar, la aplicación usa `installIfMissing` para registrar los módulos de sistema; el runtime no duplica una entidad ya instalada. El catálogo `entities` se carga por defecto, pero se puede desactivar con `EXENSIAL_ENABLE_ENTITY_CATALOG=false` o `createApp({ enableEntityCatalog: false })`. Con el catálogo desactivado, el motor CRUD continúa funcionando para módulos instalados por código, pero no expone la API para crear entidades dinámicamente.
+
+### Contexto, namespace y módulo
+
+Una definición enviada a `POST /v1/entities` puede incluir los campos opcionales `namespace` y `module`:
+
+```json
+{
+  "name": "announcements",
+  "namespace": "demo.content",
+  "module": "example/normalize-title",
+  "definition": "type Announcement = { title: string }"
+}
+```
+
+`name` sigue siendo la identidad única y la ruta REST (`/v1/announcements`). `namespace` es contexto lógico, con una convención de puntos inspirada en packages (`empresa.area`), para organizar UI, permisos o catálogos futuros sin romper rutas existentes. `module` es el identificador estable de un comportamiento confiable registrado por la aplicación.
+
+El servidor **no importa ni ejecuta código enviado por HTTP**. Los módulos se importan en el bootstrap de la aplicación y se entregan a `createApp({ behaviorModules: [...] })`; el request solo puede seleccionar uno de esos ids permitidos. Un id desconocido devuelve `400`.
+
+## Middleware de operación de entidad
+
+Una entidad puede agregar comportamiento a cada operación normalizada: `create`, `bulkCreate`, `list`, `get`, `replace`, `update` y `delete`. El contrato es un middleware con `context` y `next()`:
+
+```ts
+import type { EntityBehaviorModule } from "./application/entity-behaviors";
+
+const normalizeTitle: EntityBehaviorModule = {
+  id: "example/normalize-title",
+  operations: {
+    create: async (context, next) => {
+      const input = context.input as Record<string, unknown>;
+      input.title = String(input.title).trim().toUpperCase(); // antes del CRUD
+      await next();                                           // CRUD genérico
+      // context.result permite lógica posterior al CRUD
+    }
+  }
+};
+```
+
+El runtime primero aplica el filtro y validación derivados del `type`; luego ejecuta estos middlewares y, al final, el CRUD genérico contra el repositorio. Llamar `await next()` complementa el comportamiento por defecto antes y después. No llamarlo permite reemplazarlo, siempre que el middleware asigne `context.result` cuando la operación deba devolver datos. `next()` solo puede invocarse una vez por capa.
+
+El `context` incluye `runtime`, `request`, `definition`, `input` ya validado, `current` para operaciones sobre un registro y `result` después del CRUD. Esto evita entregar `IncomingMessage` o `ServerResponse` a la lógica de negocio.
+
 ## Entidades de transporte `requests` y `responses`
 
 El propio pipeline es observable dentro del mismo dominio extensible:
@@ -130,6 +175,8 @@ Los metadatos se preservan completos en `documentation` y se emiten en OpenAPI c
 ## OpenAPI y Swagger dinámicos
 
 `GET /openapi.json` crea un documento OpenAPI 3.0.4 en cada request a partir de las entidades instaladas, sus campos, campos requeridos y metadatos localizados. Al crear, editar o borrar una definición en `entities`, el siguiente documento refleja el cambio.
+
+Cada esquema también expone `x-exensial-context`, con el `namespace`, id de `module` y lista de operaciones interceptadas. Swagger muestra el CRUD completo que sigue existiendo para la entidad; la extensión permite que clientes humanos o UI especializadas indiquen qué lógica adicional participa.
 
 `GET /docs` entrega una página Swagger UI que consume `/openapi.json`. Para mantener el proyecto sin dependencias de frontend, los assets de Swagger UI se cargan desde `unpkg`; la especificación JSON sigue estando disponible aunque el navegador no tenga acceso a ese CDN. En un despliegue sin acceso externo se puede sustituir esa página por assets locales de `swagger-ui-dist` sin cambiar el generador OpenAPI.
 

@@ -15,7 +15,19 @@ export interface EntityLifecycle {
 export interface EntityModule {
   definition: EntityDefinition;
   lifecycle?: EntityLifecycle;
+  operations?: Partial<Record<DomainRequest["action"], EntityOperationMiddleware | EntityOperationMiddleware[]>>;
 }
+
+export interface EntityOperationContext {
+  runtime: EntityRuntime;
+  request: DomainRequest;
+  definition: EntityDefinition;
+  input?: Record<string, unknown> | Record<string, unknown>[];
+  current?: EntityRecord;
+  result?: EntityRecord | EntityRecord[];
+}
+
+export type EntityOperationMiddleware = (context: EntityOperationContext, next: () => Promise<void>) => Promise<void>;
 
 type ActiveEntity = EntityModule & { repository: Repository<EntityRecord> };
 
@@ -25,6 +37,12 @@ export class EntityRuntime {
   install(module: EntityModule): void {
     if (this.entities.has(module.definition.name)) throw new EntityConflictError(`Entity already exists: ${module.definition.name}`);
     this.entities.set(module.definition.name, { ...module, repository: new InMemoryRepository<EntityRecord>() });
+  }
+
+  installIfMissing(module: EntityModule): boolean {
+    if (this.entities.has(module.definition.name)) return false;
+    this.install(module);
+    return true;
   }
 
   replace(name: string, module: EntityModule): void {
@@ -54,30 +72,41 @@ export class EntityRuntime {
   async execute(request: DomainRequest): Promise<EntityRecord | EntityRecord[] | undefined> {
     const entity = this.entities.get(request.entityName);
     if (!entity) throw new EntityNotFoundError("Entity not found");
-    switch (request.action) {
-      case "list": return entity.repository.findAll();
-      case "get": return this.requireRecord(entity, request.id);
-      case "create": return this.create(entity, this.onePayload(request.payload));
-      case "bulkCreate": return this.createMany(entity, this.manyPayload(request.payload));
-      case "replace": return this.update(entity, request.id, this.onePayload(request.payload), false);
-      case "update": return this.update(entity, request.id, this.onePayload(request.payload), true);
-      case "delete":
-        await this.delete(entity, request.id);
-        return undefined;
-    }
+    const context: EntityOperationContext = { runtime: this, request, definition: entity.definition };
+    this.prepareContext(entity, context);
+    await runOperationMiddleware(context, operationMiddleware(entity, request.action), () => this.executeDefault(entity, context));
+    return context.result;
   }
 
-  private async create(entity: ActiveEntity, input: unknown): Promise<EntityRecord> {
-    const data = validateRecord(input, entity.definition.fields);
+  private prepareContext(entity: ActiveEntity, context: EntityOperationContext): void {
+    const { request } = context;
+    if (request.action === "create") context.input = validateRecord(this.onePayload(request.payload), entity.definition.fields);
+    if (request.action === "bulkCreate") context.input = this.manyPayload(request.payload).map((input) => validateRecord(input, entity.definition.fields));
+    if (request.action === "replace" || request.action === "update") {
+      context.current = this.requireRecord(entity, request.id);
+      context.input = validateRecord(this.onePayload(request.payload), entity.definition.fields, request.action === "update");
+    }
+    if (request.action === "get" || request.action === "delete") context.current = this.requireRecord(entity, request.id);
+  }
+
+  private async executeDefault(entity: ActiveEntity, context: EntityOperationContext): Promise<void> {
+    const { action } = context.request;
+    if (action === "list") context.result = entity.repository.findAll();
+    if (action === "get") context.result = context.current;
+    if (action === "create") context.result = await this.create(entity, context.input as Record<string, unknown>);
+    if (action === "bulkCreate") context.result = await this.createMany(entity, context.input as Record<string, unknown>[]);
+    if (action === "replace" || action === "update") context.result = await this.update(entity, context.current!, context.input as Record<string, unknown>);
+    if (action === "delete") await this.delete(entity, context.current!);
+  }
+
+  private async create(entity: ActiveEntity, data: Record<string, unknown>): Promise<EntityRecord> {
     await entity.lifecycle?.beforeCreate?.(data);
     const record = entity.repository.create(data as Omit<EntityRecord, "id">);
     await entity.lifecycle?.afterCreate?.(record);
     return record;
   }
 
-  private async createMany(entity: ActiveEntity, inputs: unknown[]): Promise<EntityRecord[]> {
-    // Validate every imported record before the first write.
-    const records = inputs.map((input) => validateRecord(input, entity.definition.fields));
+  private async createMany(entity: ActiveEntity, records: Record<string, unknown>[]): Promise<EntityRecord[]> {
     const created: EntityRecord[] = [];
     for (const data of records) {
       await entity.lifecycle?.beforeCreate?.(data);
@@ -88,9 +117,7 @@ export class EntityRuntime {
     return created;
   }
 
-  private async update(entity: ActiveEntity, id: string | undefined, input: unknown, partial: boolean): Promise<EntityRecord> {
-    const current = this.requireRecord(entity, id);
-    const changes = validateRecord(input, entity.definition.fields, partial);
+  private async update(entity: ActiveEntity, current: EntityRecord, changes: Record<string, unknown>): Promise<EntityRecord> {
     const next = { ...current, ...changes };
     await entity.lifecycle?.beforeUpdate?.(current, next);
     const record = entity.repository.update(current.id, changes as Partial<Omit<EntityRecord, "id">>);
@@ -99,8 +126,7 @@ export class EntityRuntime {
     return record;
   }
 
-  private async delete(entity: ActiveEntity, id: string | undefined): Promise<void> {
-    const record = this.requireRecord(entity, id);
+  private async delete(entity: ActiveEntity, record: EntityRecord): Promise<void> {
     await entity.lifecycle?.beforeDelete?.(record);
     entity.repository.delete(record.id);
     await entity.lifecycle?.afterDelete?.(record);
@@ -123,6 +149,23 @@ export class EntityRuntime {
     if (!payload.values.length) throw new ValidationError("Bulk creation requires at least one record");
     return payload.values;
   }
+}
+
+function operationMiddleware(entity: ActiveEntity, action: DomainRequest["action"]): EntityOperationMiddleware[] {
+  const middleware = entity.operations?.[action];
+  return !middleware ? [] : Array.isArray(middleware) ? middleware : [middleware];
+}
+
+async function runOperationMiddleware(context: EntityOperationContext, middleware: EntityOperationMiddleware[], terminal: () => Promise<void>): Promise<void> {
+  let index = -1;
+  const dispatch = async (position: number): Promise<void> => {
+    if (position <= index) throw new Error("Entity operation next() called more than once");
+    index = position;
+    const handler = middleware[position];
+    if (handler) return handler(context, () => dispatch(position + 1));
+    return terminal();
+  };
+  await dispatch(0);
 }
 
 export class EntityNotFoundError extends Error {}

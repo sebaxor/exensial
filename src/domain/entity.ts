@@ -17,6 +17,7 @@ export interface EntityDefinition {
   name: string;
   fields: Record<string, FieldDefinition>;
   documentation?: Documentation;
+  context?: { namespace?: string; module?: string; operations?: string[] };
 }
 
 export type EntityRecord = Record<string, unknown> & { id: string };
@@ -24,4 +25,6 @@ export type EntityRecord = Record<string, unknown> & { id: string };
 export type EntityDefinitionRecord = EntityRecord & {
   name: string;
   definition: string;
+  namespace?: string;
+  module?: string;
 };
