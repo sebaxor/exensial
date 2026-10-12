@@ -72,6 +72,10 @@ export class EntityRuntime {
     this.requireRecord(entity, id);
   }
 
+  findRecord(entityName: string, id: string, namespace?: string): EntityRecord | undefined {
+    return this.entities.get(entityKey(entityName, namespace))?.repository.findById(id);
+  }
+
   async execute(request: DomainRequest, options: { createId?: string } = {}): Promise<EntityRecord | EntityRecord[] | undefined> {
     const entity = this.entities.get(entityKey(request.entityName, request.namespace));
     if (!entity) throw new EntityNotFoundError("Entity not found");

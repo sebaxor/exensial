@@ -143,6 +143,38 @@ The middleware context contains `request` (the normalized request), `definition`
 
 `await next()` invokes the next operation middleware and eventually generic CRUD. Call it once to extend the default behavior before and/or after it. Omitting it replaces default CRUD; set `context.result` when the operation needs to return data. Errors thrown by a behavior are normalized by the HTTP adapter. Because only server-registered module ids are accepted, no code received over HTTP is imported or executed.
 
+### Runtime-configured availability reservations
+
+Exensial includes the reusable trusted module `exensial/availability-reservation`. The module code is part of the server; the entity names, fields, states, and validation criteria are supplied as declarative `behavior` data when the entity is created. This keeps library-specific rules out of application source while retaining the boundary that HTTP cannot upload code.
+
+```json
+{
+  "name": "loans",
+  "namespace": "library",
+  "module": "exensial/availability-reservation",
+  "behavior": {
+    "resource": {
+      "entityName": "books",
+      "namespace": "library",
+      "referenceField": "bookId",
+      "availabilityField": "available"
+    },
+    "loan": {
+      "statusField": "status",
+      "activeValue": "active",
+      "returnedValue": "returned",
+      "returnedAtField": "returnedAt",
+      "requiredFields": ["bookId", "memberId", "borrowedAt", "dueAt"],
+      "isoDateFields": ["borrowedAt", "dueAt", "returnedAt"],
+      "dateRange": { "startField": "borrowedAt", "endField": "dueAt" }
+    }
+  },
+  "definition": "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }"
+}
+```
+
+On create, this configuration rejects blank identifiers, invalid dates, a due date not after the borrow date, an unknown book, and an unavailable book. A valid request sets the loan status to `active` and updates the referenced book to `available: false`. A `PATCH` with `status: "returned"` and a valid `returnedAt` releases the book (`available: true`). The workflow rejects a second return, attempts to set another status, bulk loan creation, and deletion of an active loan.
+
 ## Disabling the catalog
 
 The entity catalog is enabled by default. To run only modules installed in application code:

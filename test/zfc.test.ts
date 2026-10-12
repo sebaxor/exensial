@@ -175,6 +175,57 @@ test("allows equal entity names in separate namespaces", async () => {
   });
 });
 
+test("configures availability reservation rules for runtime entities", async () => {
+  await withApi(async (baseUrl) => {
+    const post = (path: string, body: unknown) => fetch(`${baseUrl}${path}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+    });
+    await post("/v1/entities", {
+      name: "books", namespace: "library", definition: "type Book = { title: string; available: boolean }"
+    });
+    const book = await (await post("/v1/library/books", { title: "A Wizard of Earthsea", available: true })).json();
+    const loanDefinition = await post("/v1/entities", {
+      name: "loans",
+      namespace: "library",
+      module: "exensial/availability-reservation",
+      behavior: {
+        resource: { entityName: "books", namespace: "library", referenceField: "bookId", availabilityField: "available" },
+        loan: {
+          statusField: "status", activeValue: "active", returnedValue: "returned", returnedAtField: "returnedAt",
+          requiredFields: ["bookId", "memberId", "borrowedAt", "dueAt"], isoDateFields: ["borrowedAt", "dueAt", "returnedAt"],
+          dateRange: { startField: "borrowedAt", endField: "dueAt" }
+        }
+      },
+      definition: "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }"
+    });
+    assert.equal(loanDefinition.status, 201);
+
+    assert.equal((await post("/v1/library/loans", {
+      bookId: book.id, memberId: " ", borrowedAt: "2026-10-12T10:00:00.000Z", dueAt: "2026-10-26T10:00:00.000Z"
+    })).status, 400);
+    const created = await post("/v1/library/loans", {
+      bookId: book.id, memberId: "member-1", borrowedAt: "2026-10-12T10:00:00.000Z", dueAt: "2026-10-26T10:00:00.000Z"
+    });
+    const loan = await created.json();
+    assert.equal(created.status, 201);
+    assert.equal(loan.status, "active");
+    assert.equal((await (await fetch(`${baseUrl}/v1/library/books/${book.id}`)).json()).available, false);
+
+    assert.equal((await post("/v1/library/loans", {
+      bookId: book.id, memberId: "member-2", borrowedAt: "2026-10-12T10:00:00.000Z", dueAt: "2026-10-26T10:00:00.000Z"
+    })).status, 400);
+    assert.equal((await fetch(`${baseUrl}/v1/library/loans/${loan.id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "returned", returnedAt: "2026-10-15T12:00:00.000Z" })
+    })).status, 200);
+    assert.equal((await (await fetch(`${baseUrl}/v1/library/books/${book.id}`)).json()).available, true);
+    assert.equal((await fetch(`${baseUrl}/v1/library/loans/${loan.id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "returned", returnedAt: "2026-10-15T12:00:00.000Z" })
+    })).status, 400);
+  });
+});
+
 test("can disable the entity catalog layer", async () => {
   await withApi(async (baseUrl) => {
     assert.equal((await fetch(`${baseUrl}/v1/entities`)).status, 404);

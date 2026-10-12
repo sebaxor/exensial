@@ -229,5 +229,9 @@ const normalizeTitle: EntityBehaviorModule = {
 };
 \`\`\`
 
-Call \`await next()\` to continue to generic CRUD. Do not call it when the module intentionally replaces generic CRUD; in that case it must assign \`context.result\` itself. Select this module while defining an entity with \`"module": "library/normalize-title"\`. An unknown module id is rejected, and code received over HTTP is never executed.`;
+Call \`await next()\` to continue to generic CRUD. Do not call it when the module intentionally replaces generic CRUD; in that case it must assign \`context.result\` itself. Select this module while defining an entity with \`"module": "library/normalize-title"\`. An unknown module id is rejected, and code received over HTTP is never executed.
+
+### Runtime-configured reservation workflow
+
+The built-in \`exensial/availability-reservation\` module is a reusable example. Set its \`behavior\` object to name the resource entity, reference field, availability field, status values, and date rules. For a loan entity it can reject blank ids, invalid or misordered dates, missing books, and unavailable books; it marks the book unavailable when a loan is created and available again when that loan is returned. The full configuration and request examples are in the entity authoring guide.`;
 }

@@ -4,6 +4,7 @@ import type { DomainRequest } from "../domain/request";
 export interface EntityBehaviorModule {
   id: string;
   operations: Partial<Record<DomainRequest["action"], EntityOperationMiddleware | EntityOperationMiddleware[]>>;
+  validateConfiguration?(configuration: unknown): void;
 }
 
 /** Trusted behavior modules are registered by application code, never uploaded over HTTP. */

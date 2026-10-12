@@ -15,7 +15,8 @@ const definition = {
     name: { type: "string", required: true, documentation: { title: { en: "Route name" } } },
     definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type" } } },
     namespace: { type: "string", required: false, documentation: { title: { en: "Namespace" } } },
-    module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" } } }
+    module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" } } },
+    behavior: { type: "json", required: false, documentation: { title: { en: "Behavior configuration" } } }
   }
 } satisfies EntityModule["definition"];
 
@@ -23,6 +24,7 @@ function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehavior
   const parsed = parseEntitySource(record.definition);
   const behavior = record.module ? behaviors.get(record.module) : undefined;
   if (record.module && !behavior) throw new ValidationError(`Unknown behavior module: ${record.module}`);
+  behavior?.validateConfiguration?.(record.behavior);
   return {
     definition: {
       name: record.name,
@@ -31,6 +33,7 @@ function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehavior
       context: {
         namespace: record.namespace,
         module: record.module,
+        behavior: record.behavior,
         operations: behavior ? Object.keys(behavior.operations) : undefined
       }
     },
