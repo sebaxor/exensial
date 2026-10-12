@@ -10,6 +10,7 @@ type HttpInput = { method: string; url: string; body?: string };
 export type RequestContext = {
   request: IncomingMessage;
   response: ServerResponse;
+  requestStartedAt?: number;
   httpInput?: HttpInput;
   domainRequest?: DomainRequest;
   domainResponse?: DomainResponse;
@@ -33,6 +34,7 @@ export function compose(middlewares: Middleware[]): (context: RequestContext) =>
 export function httpAdapterMiddleware(): Middleware {
   return async (context, next) => {
     try {
+      context.requestStartedAt = Date.now();
       const method = context.request.method ?? "GET";
       context.httpInput = { method, url: context.request.url ?? "/", body: writesBody(method) ? await readBody(context.request) : undefined };
       await next();
@@ -102,6 +104,7 @@ export function requestRepositoryMiddleware(runtime: EntityRuntime): Middleware 
         kind: "one",
         value: {
           apiVersion: request.apiVersion,
+          receivedAt: new Date(context.requestStartedAt ?? Date.now()).toISOString(),
           ...(request.namespace ? { namespace: request.namespace } : {}),
           entityName: request.entityName,
           action: request.action,
@@ -124,6 +127,7 @@ export function responseRepositoryMiddleware(runtime: EntityRuntime): Middleware
       context.domainResponse = errorResponse(error);
     }
     const response = context.domainResponse ?? { status: 500, body: { error: "Internal server error" } };
+    const completedAt = new Date();
     await runtime.execute({
       apiVersion: context.domainRequest?.apiVersion ?? "v1",
       entityName: "responses",
@@ -133,6 +137,8 @@ export function responseRepositoryMiddleware(runtime: EntityRuntime): Middleware
         value: {
           ...(context.requestRecord?.id ? { requestId: context.requestRecord.id } : {}),
           status: response.status,
+          completedAt: completedAt.toISOString(),
+          durationMs: Math.max(0, completedAt.getTime() - (context.requestStartedAt ?? completedAt.getTime())),
           ...(response.body === undefined ? {} : { body: response.body })
         }
       }
