@@ -2,6 +2,8 @@
 
 Exensial is a minimal TypeScript runtime for defining data collections and exposing standard REST CRUD at runtime.
 
+Its conceptual inspiration is the idea of a *set*: an entity defines the shape and rules of a collection, and its records are the elements in that collection. Earlier exploration referred to this idea as “ZFC”; Exensial deliberately uses domain-oriented names such as **entity** and **record** instead.
+
 The source runs directly through `tsx`; internal imports intentionally omit file extensions.
 
 ```bash
