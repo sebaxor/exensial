@@ -2,6 +2,7 @@ import type { EntityDefinitionRecord } from "../domain/entity";
 import { parseEntitySource, ValidationError } from "../domain/schema";
 import { EntityConflictError, type EntityModule, type EntityRuntime } from "../application/entity-runtime";
 import type { EntityBehaviorRegistry } from "../application/entity-behaviors";
+import { compileRuntimeLogic } from "../application/runtime-logic";
 
 const definition = {
   name: "entities",
@@ -16,7 +17,8 @@ const definition = {
     definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type" } } },
     namespace: { type: "string", required: false, documentation: { title: { en: "Namespace" } } },
     module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" } } },
-    behavior: { type: "json", required: false, documentation: { title: { en: "Behavior configuration" } } }
+    behavior: { type: "json", required: false, documentation: { title: { en: "Behavior configuration" } } },
+    logic: { type: "json", required: false, documentation: { title: { en: "Runtime business logic" } } }
   }
 } satisfies EntityModule["definition"];
 
@@ -25,6 +27,7 @@ function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehavior
   const behavior = record.module ? behaviors.get(record.module) : undefined;
   if (record.module && !behavior) throw new ValidationError(`Unknown behavior module: ${record.module}`);
   behavior?.validateConfiguration?.(record.behavior);
+  const logic = compileRuntimeLogic(record.logic);
   return {
     definition: {
       name: record.name,
@@ -34,10 +37,11 @@ function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehavior
         namespace: record.namespace,
         module: record.module,
         behavior: record.behavior,
-        operations: behavior ? Object.keys(behavior.operations) : undefined
+        logic: record.logic,
+        operations: [...Object.keys(behavior?.operations ?? {}), ...Object.keys(logic ?? {})]
       }
     },
-    operations: behavior?.operations
+    operations: { ...behavior?.operations, ...logic }
   };
 }
 

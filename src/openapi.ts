@@ -211,27 +211,11 @@ type Task = {
 }
 \`\`\`
 
-### Business logic
+### Runtime business logic
 
-\`module\` is optional. It selects a **trusted behavior module already registered by the application**; it is not JavaScript sent by the client. A module can run before and after \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\`, or \`delete\`.
+Use the optional \`logic\` object in the same request that creates an entity. It is a high-level business definition received and installed through HTTP, not a server-side module selection and not uploaded JavaScript.
 
-\`\`\`ts
-const normalizeTitle: EntityBehaviorModule = {
-  id: "library/normalize-title",
-  operations: {
-    create: async (context, next) => {
-      const input = context.input as Record<string, unknown>;
-      input.title = String(input.title).trim(); // before CRUD
-      await next();                             // generic repository CRUD
-      // context.result is available after CRUD
-    }
-  }
-};
-\`\`\`
+Each CRUD action can declare \`before\`, \`after\`, and \`onError\` rules. The available rules are \`assert\`, \`assertDateOrder\`, \`lookup\`, \`set\`, \`patch\`, and \`reject\`. They can validate DTO fields, read a related entity, assign a calculated value, update a related record, or reject an operation.
 
-Call \`await next()\` to continue to generic CRUD. Do not call it when the module intentionally replaces generic CRUD; in that case it must assign \`context.result\` itself. Select this module while defining an entity with \`"module": "library/normalize-title"\`. An unknown module id is rejected, and code received over HTTP is never executed.
-
-### Runtime-configured reservation workflow
-
-The built-in \`exensial/availability-reservation\` module is a reusable example. Set its \`behavior\` object to name the resource entity, reference field, availability field, status values, and date rules. For a loan entity it can reject blank ids, invalid or misordered dates, missing books, and unavailable books; it marks the book unavailable when a loan is created and available again when that loan is returned. The full configuration and request examples are in the entity authoring guide.`;
+For example, a loan's create rules can look up its book, assert \`book.available === true\`, set its status to \`active\`, and patch the book to \`available: false\`. Its return rules can require \`status: "returned"\` and a date, then release the book after the loan update succeeds. See the entity authoring guide for the complete JSON definition.`;
 }

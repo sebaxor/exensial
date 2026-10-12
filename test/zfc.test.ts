@@ -175,7 +175,7 @@ test("allows equal entity names in separate namespaces", async () => {
   });
 });
 
-test("configures availability reservation rules for runtime entities", async () => {
+test("installs availability reservation rules through runtime logic", async () => {
   await withApi(async (baseUrl) => {
     const post = (path: string, body: unknown) => fetch(`${baseUrl}${path}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
@@ -187,14 +187,32 @@ test("configures availability reservation rules for runtime entities", async () 
     const loanDefinition = await post("/v1/entities", {
       name: "loans",
       namespace: "library",
-      module: "exensial/availability-reservation",
-      behavior: {
-        resource: { entityName: "books", namespace: "library", referenceField: "bookId", availabilityField: "available" },
-        loan: {
-          statusField: "status", activeValue: "active", returnedValue: "returned", returnedAtField: "returnedAt",
-          requiredFields: ["bookId", "memberId", "borrowedAt", "dueAt"], isoDateFields: ["borrowedAt", "dueAt", "returnedAt"],
-          dateRange: { startField: "borrowedAt", endField: "dueAt" }
-        }
+      logic: {
+        create: {
+          before: [
+            { type: "assert", field: "bookId", rule: "nonEmptyString", message: "bookId is required" },
+            { type: "assert", field: "memberId", rule: "nonEmptyString", message: "memberId is required" },
+            { type: "assert", field: "borrowedAt", rule: "isoDate", message: "borrowedAt must be an ISO date" },
+            { type: "assert", field: "dueAt", rule: "isoDate", message: "dueAt must be an ISO date" },
+            { type: "assertDateOrder", earlier: "borrowedAt", later: "dueAt" },
+            { type: "lookup", as: "book", entityName: "books", namespace: "library", idField: "bookId" },
+            { type: "assert", source: "book", field: "available", rule: "equals", value: true, message: "Book is not available" },
+            { type: "set", field: "status", value: "active" },
+            { type: "patch", entityName: "books", namespace: "library", idField: "bookId", value: { available: false } }
+          ],
+          onError: [{ type: "patch", entityName: "books", namespace: "library", idField: "bookId", value: { available: true } }]
+        },
+        update: {
+          before: [
+            { type: "assert", field: "status", rule: "equals", value: "returned", message: "Only returned status is allowed" },
+            { type: "assert", source: "current", field: "status", rule: "equals", value: "active", message: "Only active loans can be returned" },
+            { type: "assert", field: "returnedAt", rule: "isoDate", message: "returnedAt must be an ISO date" },
+            { type: "lookup", as: "book", entityName: "books", namespace: "library", idSource: "current", idField: "bookId" }
+          ],
+          after: [{ type: "patch", entityName: "books", namespace: "library", idSource: "current", idField: "bookId", value: { available: true } }]
+        },
+        bulkCreate: { before: [{ type: "reject", message: "Bulk loans are not allowed" }] },
+        delete: { before: [{ type: "assert", source: "current", field: "status", rule: "notEquals", value: "active", message: "Active loans cannot be deleted" }] }
       },
       definition: "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }"
     });

@@ -45,11 +45,13 @@ The identity is `(namespace, name)`. The runtime uses that pair internally, whic
 
 The system `entities` module is itself an ordinary CRUD entity with extra lifecycle rules. Creating a definition validates its type alias and installs a new module. Updating a definition replaces its schema while retaining its repository. Deleting it removes the installed entity and its endpoint. The catalog is installed only when `EXENSIAL_ENABLE_ENTITY_CATALOG` is not `false`, or when `createApp({ enableEntityCatalog: true })` is used.
 
-## Business operation middleware
+## Runtime business logic
 
-A trusted module can attach middleware to any CRUD action. The runtime validates and prepares the context first, then composes operation middleware around generic repository CRUD. `await next()` extends the default action; omitting it replaces the action. `next()` may be called once per layer.
+An entity definition may include a declarative `logic` object. The entity catalog validates and compiles it into operation middleware at runtime, so the schema and business rules arrive in the same HTTP request. Rules are deliberately high-level: validate a value, compare dates, look up a related record, set an input field, patch another entity, or reject the operation. They have `before`, `after`, and `onError` phases around generic CRUD.
 
-Modules are imported and registered by application code. An HTTP request can select only a registered module id; it cannot submit or execute code. See [the entity authoring guide](entities.md) for a complete example and the middleware context contract.
+This is not arbitrary uploaded JavaScript. The interpreter remains infrastructure code, while each entity's definition describes business intent without access to HTTP objects, repositories, filesystem, or process APIs. For example, a loan definition can look up a book, require availability, set a loan status, and change the book's availability using only JSON rules. See [the entity authoring guide](entities.md) for the complete definition.
+
+Code-defined middleware remains available for application-level extensions, but runtime entities do not require it for the supported declarative rule set.
 
 ## Type aliases and documentation
 

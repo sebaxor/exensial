@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
 import { EntityBehaviorRegistry, type EntityBehaviorModule } from "./application/entity-behaviors";
-import { availabilityReservationBehavior } from "./application/availability-reservation-behavior";
 import { createEntitiesModule } from "./entities/entities";
 import { transportModules } from "./entities/transport";
 import { compose, documentationMiddleware, entityLifecycleMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
@@ -20,7 +19,7 @@ export function createApp({
 }: AppOptions = {}) {
   const runtime = new EntityRuntime();
   const behaviors = new EntityBehaviorRegistry();
-  for (const behavior of [availabilityReservationBehavior, ...behaviorModules]) behaviors.register(behavior);
+  for (const behavior of behaviorModules) behaviors.register(behavior);
   for (const module of transportModules) runtime.installIfMissing(module);
   if (enableEntityCatalog) runtime.installIfMissing(createEntitiesModule(runtime, behaviors));
   for (const module of modules) runtime.install(module);

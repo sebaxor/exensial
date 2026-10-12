@@ -64,7 +64,7 @@ POST /v1/library/loans
 }
 ```
 
-At this minimal stage, `bookId` and `memberId` are regular strings: Exensial stores them but does not yet enforce foreign-key relationships or automatically change `available`. Those rules belong in a trusted behavior module when the application needs them.
+By default, `bookId` and `memberId` are regular strings. Add a runtime `logic` definition when the entity must look up related records, enforce business criteria, or update another entity as part of the operation.
 
 ## Localized documentation
 
@@ -89,91 +89,67 @@ type Task = {
 
 OpenAPI uses the English text, when present, in standard `title` and `description` properties. It preserves every locale in `x-exensial-localized`, so a UI can select its own language without parsing the source again.
 
-## Business behavior
+## Runtime business logic
 
-The HTTP definition body never contains executable code. Application code registers trusted behavior modules at startup; an entity can select one by its stable `module` id.
+`logic` is a high-level, declarative business definition sent to `POST /v1/entities` with the schema. It is installed immediately for that entity. It is not JavaScript and has no HTTP, repository, or middleware details: it describes validations, record lookups, field assignments, and patches to related entities.
 
-This example normalizes a book title before the default create behavior, rejects a second active loan for the same member and book, and decorates the resulting record after it is saved:
+Each CRUD action can have three phases:
 
-```ts
-import { createApp } from "./app";
-import type { EntityBehaviorModule } from "./application/entity-behaviors";
+- `before`: runs before generic CRUD; reject invalid input, look up related records, or set computed fields.
+- `after`: runs only after generic CRUD succeeds; update related entities.
+- `onError`: runs when generic CRUD fails after `before`; useful for compensating a reservation.
 
-const libraryLoans: EntityBehaviorModule = {
-  id: "library/loans",
-  operations: {
-    create: async (context, next) => {
-      const input = context.input as Record<string, unknown>;
-      input.bookTitle = String(input.bookTitle).trim();
+The supported rule types are:
 
-      const existing = await context.runtime.execute({
-        apiVersion: context.request.apiVersion,
-        namespace: context.request.namespace,
-        entityName: context.definition.name,
-        action: "list"
-      }) as Array<Record<string, unknown>>;
-      if (existing.some((loan) => loan.memberId === input.memberId && loan.bookTitle === input.bookTitle && !loan.returnedAt)) {
-        throw new Error("This member already has this book on loan");
-      }
+- `assert`: validate `nonEmptyString`, `isoDate`, `equals`, or `notEquals`.
+- `assertDateOrder`: require one date field to be later than another.
+- `lookup`: read a record from another entity and bind it under a local name.
+- `set`: assign a value to the current create/update input.
+- `patch`: partially update a referenced entity.
+- `reject`: stop an operation with a business error.
 
-      await next(); // runs validation-complete generic repository CRUD
-      context.result = { ...(context.result as Record<string, unknown>), status: "active" }; // response decoration
+This is the complete loan definition used by the local example. It is business logic received through HTTP: no library-specific TypeScript is imported by the application.
+
+```json
+{
+  "name": "loans",
+  "namespace": "library",
+  "definition": "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }",
+  "logic": {
+    "create": {
+      "before": [
+        { "type": "assert", "field": "bookId", "rule": "nonEmptyString" },
+        { "type": "assert", "field": "memberId", "rule": "nonEmptyString" },
+        { "type": "assert", "field": "borrowedAt", "rule": "isoDate" },
+        { "type": "assert", "field": "dueAt", "rule": "isoDate" },
+        { "type": "assertDateOrder", "earlier": "borrowedAt", "later": "dueAt" },
+        { "type": "lookup", "as": "book", "entityName": "books", "namespace": "library", "idField": "bookId" },
+        { "type": "assert", "source": "book", "field": "available", "rule": "equals", "value": true },
+        { "type": "set", "field": "status", "value": "active" },
+        { "type": "patch", "entityName": "books", "namespace": "library", "idField": "bookId", "value": { "available": false } }
+      ],
+      "onError": [
+        { "type": "patch", "entityName": "books", "namespace": "library", "idField": "bookId", "value": { "available": true } }
+      ]
     },
-    delete: async (_context, next) => { await next(); }
+    "update": {
+      "before": [
+        { "type": "assert", "field": "status", "rule": "equals", "value": "returned" },
+        { "type": "assert", "source": "current", "field": "status", "rule": "equals", "value": "active" },
+        { "type": "assert", "field": "returnedAt", "rule": "isoDate" },
+        { "type": "lookup", "as": "book", "entityName": "books", "namespace": "library", "idSource": "current", "idField": "bookId" }
+      ],
+      "after": [
+        { "type": "patch", "entityName": "books", "namespace": "library", "idSource": "current", "idField": "bookId", "value": { "available": true } }
+      ]
+    },
+    "bulkCreate": { "before": [{ "type": "reject", "message": "Bulk loans are not allowed" }] },
+    "delete": { "before": [{ "type": "assert", "source": "current", "field": "status", "rule": "notEquals", "value": "active" }] }
   }
-};
-
-createApp({ behaviorModules: [libraryLoans] });
-```
-
-Register an entity that uses the module through the entity catalog:
-
-```json
-{
-  "name": "loans",
-  "namespace": "library",
-  "module": "library/loans",
-  "definition": "type Loan = { memberId: string; bookTitle: string; returnedAt?: string }"
 }
 ```
 
-The module runs for `POST /v1/library/loans`. Available operations are `create`, `bulkCreate`, `list`, `get`, `replace`, `update`, and `delete`.
-
-The middleware context contains `request` (the normalized request), `definition` (schema and context), `input` (validated create/replace/update data), `current` (loaded item data), `result` (the CRUD result), and `runtime` (the same domain runtime used by every entity).
-
-`await next()` invokes the next operation middleware and eventually generic CRUD. Call it once to extend the default behavior before and/or after it. Omitting it replaces default CRUD; set `context.result` when the operation needs to return data. Errors thrown by a behavior are normalized by the HTTP adapter. Because only server-registered module ids are accepted, no code received over HTTP is imported or executed.
-
-### Runtime-configured availability reservations
-
-Exensial includes the reusable trusted module `exensial/availability-reservation`. The module code is part of the server; the entity names, fields, states, and validation criteria are supplied as declarative `behavior` data when the entity is created. This keeps library-specific rules out of application source while retaining the boundary that HTTP cannot upload code.
-
-```json
-{
-  "name": "loans",
-  "namespace": "library",
-  "module": "exensial/availability-reservation",
-  "behavior": {
-    "resource": {
-      "entityName": "books",
-      "namespace": "library",
-      "referenceField": "bookId",
-      "availabilityField": "available"
-    },
-    "loan": {
-      "statusField": "status",
-      "activeValue": "active",
-      "returnedValue": "returned",
-      "returnedAtField": "returnedAt",
-      "requiredFields": ["bookId", "memberId", "borrowedAt", "dueAt"],
-      "isoDateFields": ["borrowedAt", "dueAt", "returnedAt"],
-      "dateRange": { "startField": "borrowedAt", "endField": "dueAt" }
-    }
-  },
-  "definition": "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }"
-}
-```
-
-On create, this configuration rejects blank identifiers, invalid dates, a due date not after the borrow date, an unknown book, and an unavailable book. A valid request sets the loan status to `active` and updates the referenced book to `available: false`. A `PATCH` with `status: "returned"` and a valid `returnedAt` releases the book (`available: true`). The workflow rejects a second return, attempts to set another status, bulk loan creation, and deletion of an active loan.
+On create, this logic validates the DTO, looks up the book, rejects an unavailable book, writes `status: "active"`, and marks the book unavailable. On return, it accepts only an active loan with `status: "returned"` and a valid `returnedAt`, then releases the book after the loan update succeeds.
 
 ## Disabling the catalog
 
