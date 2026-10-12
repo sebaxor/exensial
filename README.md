@@ -39,4 +39,6 @@ También se pueden instalar entidades escritas como módulos TypeScript al crear
 
 Cada request REST reconocido y cada resultado se conservan, respectivamente, como entidades de sistema consultables en `/v1/requests` y `/v1/responses`.
 
+La especificación dinámica está en `/openapi.json` y la interfaz Swagger está en `/docs`.
+
 Consulta [la arquitectura y las decisiones técnicas](docs/architecture.md) para el diseño completo.

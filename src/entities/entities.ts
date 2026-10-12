@@ -1,11 +1,12 @@
 import type { EntityDefinitionRecord } from "../domain/entity";
-import { parseTypeDefinition, ValidationError } from "../domain/schema";
+import { parseEntitySource, ValidationError } from "../domain/schema";
 import { EntityConflictError, type EntityModule, type EntityRuntime } from "../application/entity-runtime";
 
 const definition = { name: "entities", fields: { name: { type: "string", required: true }, definition: { type: "string", required: true } } } as const;
 
 function dynamicModule(record: EntityDefinitionRecord): EntityModule {
-  return { definition: { name: record.name, fields: parseTypeDefinition(record.definition) } };
+  const parsed = parseEntitySource(record.definition);
+  return { definition: { name: record.name, fields: parsed.fields, documentation: parsed.documentation } };
 }
 
 /** System entity: each record deploys a regular dynamic entity. */

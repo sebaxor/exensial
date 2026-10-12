@@ -105,6 +105,34 @@ La validación conserva solo el contrato declarado por la entidad y rechaza camp
 
 Una entidad con comportamiento ejecutable se expresa como un `EntityModule` TypeScript, con `definition` y hooks. Se instala al crear la app mediante `createApp({ modules })`. El middleware REST no necesita conocer ese módulo: cualquier módulo instalado obtiene automáticamente el mismo CRUD.
 
+## Metadatos humanos y localizados
+
+La definición del tipo acepta JSDoc como convención de documentación. Los tags admitidos son `@zfc.title` y `@zfc.description`, seguidos por locale y texto. Se pueden aplicar antes del alias para documentar la entidad, o antes de un campo para documentarlo.
+
+```ts
+/**
+ * @zfc.title en Books
+ * @zfc.title es Libros
+ * @zfc.description en A catalog of books
+ */
+type Book = {
+  /**
+   * @zfc.title en Title
+   * @zfc.title es Título
+   * @zfc.description en The book's public title
+   */
+  name: string;
+}
+```
+
+Los metadatos se preservan completos en `documentation` y se emiten en OpenAPI como extensión `x-zfc-localized`. OpenAPI usa inglés, o el primer locale disponible, para sus propiedades estándar `title` y `description`. Una futura UI puede elegir cualquier locale de la extensión sin reinterpretar el tipo.
+
+## OpenAPI y Swagger dinámicos
+
+`GET /openapi.json` crea un documento OpenAPI 3.0.4 en cada request a partir de las entidades instaladas, sus campos, campos requeridos y metadatos localizados. Al crear, editar o borrar una definición en `entities`, el siguiente documento refleja el cambio.
+
+`GET /docs` entrega una página Swagger UI que consume `/openapi.json`. Para mantener el proyecto sin dependencias de frontend, los assets de Swagger UI se cargan desde `unpkg`; la especificación JSON sigue estando disponible aunque el navegador no tenga acceso a ese CDN. En un despliegue sin acceso externo se puede sustituir esa página por assets locales de `swagger-ui-dist` sin cambiar el generador OpenAPI.
+
 ## Decisiones técnicas
 
 - **Node HTTP, sin framework:** reduce dependencias y deja visible el mecanismo de middleware; un framework puede sustituir esta capa después sin cambiar el dominio.
@@ -113,6 +141,8 @@ Una entidad con comportamiento ejecutable se expresa como un `EntityModule` Type
 - **Hooks y repositorio separados:** las reglas de negocio no viven en las rutas y la persistencia no depende de HTTP.
 - **Requests y responses como entidades:** la auditoría usa el mismo runtime y repositorio que el resto del dominio, en vez de introducir un mecanismo lateral de logging.
 - **Adaptador HTTP aislado:** el dominio produce `DomainResponse`; solo el middleware externo conoce el protocolo HTTP y escribe la respuesta.
+- **JSDoc localizado como fuente de metadatos:** evita duplicar descripciones entre tipos, Swagger y UI, y permite que cada consumidor elija idioma.
+- **OpenAPI generado en runtime:** las entidades dinámicas se documentan sin una fase manual de sincronización.
 - **Errores de dominio explícitos:** conflictos, validación y recursos ausentes se traducen a `409`, `400` y `404` respectivamente.
 
 ## Límites actuales
@@ -120,4 +150,4 @@ Una entidad con comportamiento ejecutable se expresa como un `EntityModule` Type
 - Persistencia solo en memoria.
 - No hay autenticación, autorización, paginación ni migraciones de datos.
 - Al editar una definición, los registros existentes no se revalidan automáticamente contra el nuevo esquema.
-- Solo existe el happy path de tipos escalares; relaciones, arrays, fechas y restricciones adicionales son extensiones futuras.
+- Solo existe el happy path de tipos escalares y `json`; relaciones, arrays tipados, fechas y restricciones adicionales son extensiones futuras.

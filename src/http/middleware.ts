@@ -4,6 +4,7 @@ import type { EntityRecord } from "../domain/entity";
 import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
 import type { DomainResponse } from "../domain/response";
 import { BadRequestError, parseJson, readBody, sendEmpty, sendJson } from "../http";
+import { createOpenApi } from "../openapi";
 
 type HttpInput = { method: string; url: string; body?: string };
 export type RequestContext = {
@@ -39,6 +40,22 @@ export function httpAdapterMiddleware(): Middleware {
       context.domainResponse = errorResponse(error);
     }
     writeHttpResponse(context.response, context.domainResponse ?? { status: 500, body: { error: "Internal server error" } });
+  };
+}
+
+/** Serves generated API documentation without coupling the domain runtime to HTTP. */
+export function documentationMiddleware(runtime: EntityRuntime): Middleware {
+  return async (context, next) => {
+    const pathname = new URL(requireHttpInput(context).url, "http://localhost").pathname;
+    if (pathname === "/openapi.json") {
+      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions()) };
+      return;
+    }
+    if (pathname === "/docs") {
+      context.domainResponse = { status: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: swaggerHtml() };
+      return;
+    }
+    await next();
   };
 }
 
@@ -155,6 +172,11 @@ function errorResponse(error: unknown): DomainResponse {
 function writeHttpResponse(response: ServerResponse, domain: DomainResponse): void {
   for (const [name, value] of Object.entries(domain.headers ?? {})) response.setHeader(name, value);
   if (domain.body === undefined) return sendEmpty(response, domain.status);
+  if (typeof domain.body === "string" && response.getHeader("content-type")?.toString().startsWith("text/")) {
+    response.statusCode = domain.status;
+    response.end(domain.body);
+    return;
+  }
   sendJson(response, domain.status, domain.body);
 }
 
@@ -178,3 +200,7 @@ function writesBody(method: string): boolean { return method === "POST" || metho
 function requiresBody(action: CrudAction): boolean { return action === "create" || action === "replace" || action === "update"; }
 function capturePayload(body: unknown): PayloadPattern { return Array.isArray(body) ? { kind: "many", values: body } : { kind: "one", value: body }; }
 class MethodNotAllowedError extends Error { constructor() { super("Method not allowed"); } }
+
+function swaggerHtml(): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ZFC API</title><link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"></head><body><div id="swagger-ui"></div><script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script><script>SwaggerUIBundle({url:'/openapi.json',dom_id:'#swagger-ui'})</script></body></html>`;
+}

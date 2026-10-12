@@ -1,5 +1,5 @@
 import type { EntityDefinition, EntityRecord } from "../domain/entity";
-import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
+import type { DomainRequest, PayloadPattern } from "../domain/request";
 import { InMemoryRepository, type Repository } from "../domain/repository";
 import { ValidationError, validateRecord } from "../domain/schema";
 
@@ -40,6 +40,10 @@ export class EntityRuntime {
   }
 
   has(name: string): boolean { return this.entities.has(name); }
+
+  definitions(): EntityDefinition[] {
+    return [...this.entities.values()].map(({ definition }) => definition);
+  }
 
   assertRecord(entityName: string, id?: string): void {
     const entity = this.entities.get(entityName);

@@ -1,18 +1,29 @@
-import type { FieldDefinition, ScalarType } from "./entity";
+import type { Documentation, FieldDefinition, ScalarType } from "./entity";
 
 /** Parses the deliberately small TypeScript type-alias subset supported by ZFC. */
-export function parseTypeDefinition(source: string): Record<string, FieldDefinition> {
-  const body = source.match(/^\s*type\s+\w+\s*=\s*\{([\s\S]*)\}\s*;?\s*$/)?.[1];
-  if (!body) throw new ValidationError("Expected a TypeScript type alias, e.g. type Book = { title: string }");
+export function parseEntitySource(source: string): { typeName: string; fields: Record<string, FieldDefinition>; documentation?: Documentation } {
+  const match = source.match(/^\s*(?:\/\*\*([\s\S]*?)\*\/\s*)?type\s+(\w+)\s*=\s*\{([\s\S]*)\}\s*;?\s*$/);
+  if (!match) throw new ValidationError("Expected a TypeScript type alias, e.g. type Book = { title: string }");
+  const [, entityComment, typeName, body] = match;
 
   const fields: Record<string, FieldDefinition> = {};
-  for (const declaration of body.split(/[;,\n]/).map((part) => part.trim()).filter(Boolean)) {
-    const match = declaration.match(/^(\w+)(\?)?\s*:\s*(string|number|boolean|json)$/);
-    if (!match) throw new ValidationError(`Unsupported field declaration: ${declaration}`);
-    fields[match[1]] = { type: match[3] as ScalarType, required: !match[2] };
+  const fieldPattern = /(?:\/\*\*([\s\S]*?)\*\/\s*)?(\w+)(\?)?\s*:\s*(string|number|boolean|json)\s*[;,]?/g;
+  let cursor = 0;
+  for (const fieldMatch of body.matchAll(fieldPattern)) {
+    const [declaration, fieldComment, name, optional, type] = fieldMatch;
+    const skipped = body.slice(cursor, fieldMatch.index).trim();
+    if (skipped) throw new ValidationError(`Unsupported field declaration: ${skipped}`);
+    fields[name] = {
+      type: type as ScalarType,
+      required: !optional,
+      documentation: parseDocumentation(fieldComment)
+    };
+    cursor = (fieldMatch.index ?? 0) + declaration.length;
   }
+  const trailing = body.slice(cursor).trim();
+  if (trailing) throw new ValidationError(`Unsupported field declaration: ${trailing}`);
   if (!Object.keys(fields).length) throw new ValidationError("An entity needs at least one field");
-  return fields;
+  return { typeName, fields, documentation: parseDocumentation(entityComment) };
 }
 
 export function validateRecord(
@@ -40,6 +51,21 @@ export function validateRecord(
 function hasExpectedType(value: unknown, type: ScalarType): boolean {
   if (type === "json") return value === null || ["string", "number", "boolean", "object"].includes(typeof value);
   return typeof value === type;
+}
+
+/** Extracts localized JSDoc tags: `@zfc.title es Título` and `@zfc.description en Text`. */
+function parseDocumentation(comment?: string): Documentation | undefined {
+  if (!comment) return undefined;
+  const documentation: Documentation = {};
+  for (const line of comment.split("\n")) {
+    const tag = line.replace(/^\s*\*?\s*/, "").match(/^@zfc\.(title|description)\s+([\w-]+)\s+(.+)$/);
+    if (!tag) continue;
+    const [, property, locale, text] = tag;
+    const key = property as keyof Documentation;
+    documentation[key] ??= {};
+    documentation[key]![locale] = text.trim();
+  }
+  return Object.keys(documentation).length ? documentation : undefined;
 }
 
 export class ValidationError extends Error {}

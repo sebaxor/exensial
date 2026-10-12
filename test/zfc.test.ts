@@ -139,3 +139,34 @@ test("persists normalized requests and responses as system entities", async () =
     assert.ok(responses.some((response: { status: number }) => response.status === 201));
   });
 });
+
+test("generates localized OpenAPI documentation from JSDoc entity metadata", async () => {
+  await withApi(async (baseUrl) => {
+    const definition = `/**
+ * @zfc.title en Books
+ * @zfc.title es Libros
+ * @zfc.description en A catalog of books
+ */
+type Book = {
+  /** @zfc.title en Title */
+  name: string;
+}`;
+    const created = await fetch(`${baseUrl}/v1/entities`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "books", definition })
+    });
+    assert.equal(created.status, 201);
+
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    const schema = openapi.components.schemas.books;
+    assert.equal(schema.title, "Books");
+    assert.equal(schema.description, "A catalog of books");
+    assert.equal(schema["x-zfc-localized"].title.es, "Libros");
+    assert.equal(schema.properties.name.title, "Title");
+    assert.ok(openapi.paths["/v1/books"]);
+
+    const docs = await fetch(`${baseUrl}/docs`);
+    assert.equal(docs.headers.get("content-type"), "text/html; charset=utf-8");
+    assert.match(await docs.text(), /SwaggerUIBundle/);
+  });
+});

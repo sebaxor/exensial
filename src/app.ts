@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
 import { createEntitiesModule } from "./entities/entities";
 import { transportModules } from "./entities/transport";
-import { compose, entityLifecycleMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
+import { compose, documentationMiddleware, entityLifecycleMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
 
 export interface AppOptions {
   modules?: EntityModule[];
@@ -16,6 +16,7 @@ export function createApp({ modules = [] }: AppOptions = {}) {
   for (const module of modules) runtime.install(module);
   const handle = compose([
     httpAdapterMiddleware(),
+    documentationMiddleware(runtime),
     restPatternMiddleware(runtime),
     responseRepositoryMiddleware(runtime),
     payloadPatternMiddleware(runtime),
