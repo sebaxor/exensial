@@ -27,6 +27,45 @@ This immediately creates `POST/GET /v1/tasks` and `GET/PUT/PATCH/DELETE /v1/task
 
 The resulting routes are `GET/POST /v1/acme.work/tasks` and `GET/PUT/PATCH/DELETE /v1/acme.work/tasks/:id`. Without a namespace, the routes remain `/v1/tasks`. The pair `(namespace, name)` is the entity identity, so separate namespaces may use the same name.
 
+## Worked example: books and loans
+
+First create the collection definition. This request creates the *place where books will be stored*; it does not create a book yet.
+
+```json
+POST /v1/entities
+{
+  "name": "books",
+  "namespace": "library",
+  "definition": "type Book = { title: string; author: string; isbn: string; available: boolean }"
+}
+```
+
+Then add a book to the generated collection route:
+
+```json
+POST /v1/library/books
+{
+  "title": "The Left Hand of Darkness",
+  "author": "Ursula K. Le Guin",
+  "isbn": "978-0441478125",
+  "available": true
+}
+```
+
+The response includes the generated `id`. Store that id when creating a related loan:
+
+```json
+POST /v1/library/loans
+{
+  "bookId": "<book-id>",
+  "memberId": "<member-id>",
+  "borrowedAt": "2026-10-12T10:00:00.000Z",
+  "dueAt": "2026-10-26T10:00:00.000Z"
+}
+```
+
+At this minimal stage, `bookId` and `memberId` are regular strings: Exensial stores them but does not yet enforce foreign-key relationships or automatically change `available`. Those rules belong in a trusted behavior module when the application needs them.
+
 ## Localized documentation
 
 Use JSDoc inside the definition. `@exensial.title` and `@exensial.description` take a locale followed by text. Place them before the type alias or a field.

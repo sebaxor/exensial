@@ -143,9 +143,13 @@ function fieldExample(name: string, field: FieldDefinition, index: number): unkn
 function exampleId(): string { return "550e8400-e29b-41d4-a716-446655440000"; }
 
 function entityCatalogGuide(): string {
-  return `## Dynamic entities
+  return `## Start here: define a collection, then create records
 
-Use **POST /v1/entities** to turn a TypeScript type alias into a REST resource. For example:
+An **entity definition** describes which JSON fields a collection accepts. It does not create a book, task, or other record by itself. Send the definition to **POST /v1/entities**, then use the route that Exensial creates for the actual records.
+
+### 1. Define an entity
+
+This creates a namespaced task collection. The type alias is a string because it is data sent over HTTP.
 
 \`\`\`json
 {
@@ -155,7 +159,40 @@ Use **POST /v1/entities** to turn a TypeScript type alias into a REST resource. 
 }
 \`\`\`
 
-This publishes \`GET/POST /v1/acme.work/tasks\` and \`GET/PUT/PATCH/DELETE /v1/acme.work/tasks/{id}\`. Omit \`namespace\` to publish \`/v1/tasks\` instead.
+### 2. Create and read records
+
+After the definition succeeds, create a record at the generated collection route:
+
+\`\`\`text
+POST /v1/acme.work/tasks
+{ "title": "Prepare the demo", "completed": false }
+
+201 Created
+{ "id": "<generated-id>", "title": "Prepare the demo", "completed": false }
+\`\`\`
+
+Use that returned \`id\` with \`GET /v1/acme.work/tasks/{id}\`, \`PATCH /v1/acme.work/tasks/{id}\`, or \`DELETE /v1/acme.work/tasks/{id}\`.
+
+### How a route is chosen
+
+| Definition | Collection route | Item route |
+| --- | --- | --- |
+| \`{ "name": "tasks" }\` | \`/v1/tasks\` | \`/v1/tasks/{id}\` |
+| \`{ "name": "tasks", "namespace": "acme.work" }\` | \`/v1/acme.work/tasks\` | \`/v1/acme.work/tasks/{id}\` |
+
+The namespace is optional, but when present it is always the segment immediately after the API version. The pair of namespace and name identifies an entity, so two namespaces may both contain \`tasks\`.
+
+### CRUD behavior
+
+- **GET collection** lists records.
+- **POST collection with an object** creates one record.
+- **POST collection with an array** imports several records.
+- **GET item** reads one record by id.
+- **PUT item** replaces it and requires every required field.
+- **PATCH item** changes only the submitted fields.
+- **DELETE item** removes it and returns \`204 No Content\`.
+
+The operations below include generated request and response examples based on each entity's current fields. Read those examples as the exact shape accepted by the active schema.
 
 ### Documentation and localization
 
@@ -174,20 +211,9 @@ type Task = {
 }
 \`\`\`
 
-### CRUD conventions
-
-- **GET collection** lists records.
-- **POST collection** creates one object or imports an array of objects.
-- **GET item** reads one id.
-- **PUT item** replaces it with all required fields.
-- **PATCH item** updates only supplied fields.
-- **DELETE item** returns \`204 No Content\`.
-
-Every operation below includes generated request and response examples based on its active schema. The entity catalog itself is also an ordinary CRUD entity, so its examples show how to create new runtime resources.
-
 ### Business logic
 
-\`module\` accepts only trusted module ids registered by the server. Modules can intercept \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\`, and \`delete\`. Use \`await next()\` to extend base CRUD; omit it and assign \`context.result\` to replace it. HTTP never executes submitted code.
+\`module\` is optional. It selects a **trusted behavior module already registered by the application**; it is not JavaScript sent by the client. A module can run before and after \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\`, or \`delete\`.
 
 \`\`\`ts
 const normalizeTitle: EntityBehaviorModule = {
@@ -203,5 +229,5 @@ const normalizeTitle: EntityBehaviorModule = {
 };
 \`\`\`
 
-Select it while creating an entity with \`"module": "library/normalize-title"\`. The selected id must be registered by the application at startup.`;
+Call \`await next()\` to continue to generic CRUD. Do not call it when the module intentionally replaces generic CRUD; in that case it must assign \`context.result\` itself. Select this module while defining an entity with \`"module": "library/normalize-title"\`. An unknown module id is rejected, and code received over HTTP is never executed.`;
 }

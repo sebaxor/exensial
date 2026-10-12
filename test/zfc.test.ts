@@ -94,7 +94,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "documented-products", definition }) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.info.title, "Exensial API");
-    assert.match(openapi.info.description, /Dynamic entities/);
+    assert.match(openapi.info.description, /Start here: define a collection/);
+    assert.match(openapi.info.description, /This creates a namespaced task collection/);
     assert.equal(openapi.components.schemas.entities.title, "Entity catalog");
     const schema = openapi.components.schemas["documented-products"];
     assert.equal(schema.title, "Products");
