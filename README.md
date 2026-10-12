@@ -51,3 +51,5 @@ Every recognized request and normalized response are also stored as the system e
 The entity catalog is enabled by default. Run `EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start` to expose only application-installed modules and disable `/v1/entities`.
 
 Read [the entity authoring guide](docs/entities.md) for type syntax, localized JSDoc, namespaces, and business behavior. Read [the architecture](docs/architecture.md) for pipeline and design decisions.
+
+Runtime domain examples are documented as independent [labs](docs/labs/README.md). Each lab contains compact domain definitions first and reproducible curls in its appendix.

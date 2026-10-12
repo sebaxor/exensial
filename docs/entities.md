@@ -107,8 +107,15 @@ The supported rule types are:
 - `set`: assign a value to the current create/update input.
 - `patch`: partially update a referenced entity.
 - `reject`: stop an operation with a business error.
+- `normalize`: trim text and optionally normalize its case.
+- `validate`: apply grouped required, date, and positive-integer checks.
+- `copy`: derive one input field from another.
+- `reserve` and `release`: decrement or increment an integer inventory field.
+- `transition`: allow one explicit state change and require its transition data.
 
-This is the complete loan definition used by the local example. It is business logic received through HTTP: no library-specific TypeScript is imported by the application.
+For a compact, complete runtime example with copies and loans, see the [library circulation lab](labs/library.md). It presents the domain definition first and the installation curls separately.
+
+The following is a deliberately explicit, low-level example built from `lookup`, `assert`, and `patch`. It remains useful when a domain needs custom composition. The [library circulation lab](labs/library.md) uses the compact `reserve`, `release`, and `transition` vocabulary instead.
 
 ```json
 {
@@ -149,7 +156,7 @@ This is the complete loan definition used by the local example. It is business l
 }
 ```
 
-On create, this logic validates the DTO, looks up the book, rejects an unavailable book, writes `status: "active"`, and marks the book unavailable. On return, it accepts only an active loan with `status: "returned"` and a valid `returnedAt`, then releases the book after the loan update succeeds.
+On create, this logic validates the DTO, looks up the book, rejects an unavailable book, writes `status: "active"`, and marks the book unavailable. On return, it accepts only an active loan with `status: "returned"` and a valid `returnedAt`, then releases the book after the loan update succeeds. Prefer the compact lab definition for a copy-aware library implementation.
 
 ## Disabling the catalog
 
