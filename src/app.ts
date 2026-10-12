@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
 import { createEntitiesModule } from "./entities/entities";
-import { compose, entityLifecycleMiddleware, errorMiddleware, payloadPatternMiddleware, restPatternMiddleware } from "./http/middleware";
-import { sendJson } from "./http";
+import { transportModules } from "./entities/transport";
+import { compose, entityLifecycleMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
 
 export interface AppOptions {
   modules?: EntityModule[];
@@ -12,14 +12,18 @@ export interface AppOptions {
 export function createApp({ modules = [] }: AppOptions = {}) {
   const runtime = new EntityRuntime();
   runtime.install(createEntitiesModule(runtime));
+  for (const module of transportModules) runtime.install(module);
   for (const module of modules) runtime.install(module);
-  const handle = compose([errorMiddleware(), restPatternMiddleware(runtime), payloadPatternMiddleware(runtime), entityLifecycleMiddleware(runtime)]);
+  const handle = compose([
+    httpAdapterMiddleware(),
+    restPatternMiddleware(runtime),
+    responseRepositoryMiddleware(runtime),
+    payloadPatternMiddleware(runtime),
+    requestRepositoryMiddleware(runtime),
+    entityLifecycleMiddleware(runtime)
+  ]);
 
   return async (request: IncomingMessage, response: ServerResponse) => {
-    try {
-      await handle({ request, response });
-    } catch {
-      return sendJson(response, 500, { error: "Internal server error" });
-    }
+    await handle({ request, response });
   };
 }

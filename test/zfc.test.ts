@@ -120,3 +120,22 @@ test("captures versioned REST patterns and bulk-import payloads", async () => {
     assert.equal((await fetch(`${baseUrl}/books`)).status, 404);
   });
 });
+
+test("persists normalized requests and responses as system entities", async () => {
+  await withApi(async (baseUrl) => {
+    await fetch(`${baseUrl}/v1/entities`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "authors", definition: "type Author = { name: string }" })
+    });
+    const created = await fetch(`${baseUrl}/v1/authors`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Ursula Le Guin" })
+    });
+    assert.equal(created.status, 201);
+
+    const requests = await (await fetch(`${baseUrl}/v1/requests`)).json();
+    assert.ok(requests.some((request: { entityName: string; action: string }) => request.entityName === "authors" && request.action === "create"));
+
+    const responses = await (await fetch(`${baseUrl}/v1/responses`)).json();
+    assert.ok(responses.some((response: { status: number }) => response.status === 201));
+  });
+});

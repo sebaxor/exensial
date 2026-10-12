@@ -18,19 +18,23 @@ DELETE /v1/books/:id       → lo elimina
 
 ```text
 HTTP request
-  → errorMiddleware
+  → httpAdapterMiddleware
   → restPatternMiddleware
+  → responseRepositoryMiddleware
   → payloadPatternMiddleware
+  → requestRepositoryMiddleware
   → entityLifecycleMiddleware
-  → EntityRuntime
-  → Repository
+  → DomainResponse
+  → HTTP response
 ```
+
+`httpAdapterMiddleware` es la frontera con Node HTTP: encapsula `IncomingMessage` como método, URL y body textual; al final desencapsula un `DomainResponse` como status, headers y body HTTP. Ningún middleware interno escribe directamente sobre `ServerResponse`.
 
 `restPatternMiddleware` interpreta `/vN/:entity/:id?`, comprueba que la entidad existe y traduce método y URL a una operación CRUD. Produce una representación neutral al transporte (`DomainRequest`) con versión, entidad, id y acción. Una entidad inexistente falla ahí con `404`.
 
 `payloadPatternMiddleware` transforma el body en un patrón `one` (objeto) o `many` (array). Un array solo es válido para `POST` de colección y se convierte en `bulkCreate`. Los demás cuerpos de escritura son un único objeto. Así repositorios y hooks no reciben el request HTTP ni su body crudo.
 
-`entityLifecycleMiddleware` ejecuta la operación serializada. `errorMiddleware` traduce errores de dominio a HTTP. La prioridad para `PATCH` y `PUT` es resolver primero el recurso, para que un id ausente responda `404` aun si el body es inválido.
+`requestRepositoryMiddleware` persiste el `DomainRequest` ya normalizado. `entityLifecycleMiddleware` ejecuta la operación serializada y produce un `DomainResponse`. `responseRepositoryMiddleware` persiste ese resultado. La prioridad para `PATCH` y `PUT` es resolver primero el recurso, para que un id ausente responda `404` aun si el body es inválido.
 
 `EntityRuntime` contiene el CRUD genérico. Valida los datos contra el esquema de la entidad y ejecuta hooks antes y después de crear, actualizar o borrar.
 
@@ -54,7 +58,18 @@ La interfaz `Repository` es el límite de persistencia. Hoy la implementación e
 | Editar | valida el esquema nuevo y actualiza la entidad desplegada, preservando sus registros |
 | Borrar | retira del runtime la entidad y su endpoint |
 
-De este modo las definiciones también viven en su propio repositorio y se consultan con `GET /entities`.
+De este modo las definiciones también viven en su propio repositorio y se consultan con `GET /v1/entities`.
+
+## Entidades de transporte `requests` y `responses`
+
+El propio pipeline es observable dentro del mismo dominio extensible:
+
+- `requests` guarda versión, entidad, acción, id y payload normalizado de cada request REST reconocido.
+- `responses` guarda status, body normalizado y referencia opcional al request que lo produjo.
+
+Son `EntityModule` normales con repositorios propios, por lo que también se consultan por `GET /v1/requests` y `GET /v1/responses`. Se escriben desde middleware mediante `EntityRuntime`, no mediante HTTP, para evitar que el mecanismo de auditoría se audite recursivamente.
+
+`DomainResponse` no conoce HTTP: solo contiene `status`, `body` y headers opcionales. Esto permite sustituir el adaptador HTTP por otro transporte sin modificar el runtime, los repositorios ni los hooks.
 
 ## Tipos admitidos
 
@@ -68,7 +83,7 @@ type Book = {
 }
 ```
 
-Admite `string`, `number`, `boolean` y el indicador opcional `?`. No evalúa ni importa código recibido por HTTP: una definición enviada es declarativa, no ejecutable. Esto evita convertir el endpoint de definición en ejecución remota de código.
+Admite `string`, `number`, `boolean`, `json` y el indicador opcional `?`. `json` sirve para conservar payloads y responses normalizados. No evalúa ni importa código recibido por HTTP: una definición enviada es declarativa, no ejecutable. Esto evita convertir el endpoint de definición en ejecución remota de código.
 
 ## Contrato REST versionado
 
@@ -96,6 +111,8 @@ Una entidad con comportamiento ejecutable se expresa como un `EntityModule` Type
 - **TypeScript ejecutado por `tsx`:** el proyecto usa imports relativos sin extensión y no genera `dist`. `tsx` resuelve y transpila el fuente durante desarrollo y ejecución.
 - **`tsc --noEmit` para tipos:** ejecutar TypeScript no sustituye el chequeo estático; `npm run check` debe mantenerse en CI.
 - **Hooks y repositorio separados:** las reglas de negocio no viven en las rutas y la persistencia no depende de HTTP.
+- **Requests y responses como entidades:** la auditoría usa el mismo runtime y repositorio que el resto del dominio, en vez de introducir un mecanismo lateral de logging.
+- **Adaptador HTTP aislado:** el dominio produce `DomainResponse`; solo el middleware externo conoce el protocolo HTTP y escribe la respuesta.
 - **Errores de dominio explícitos:** conflictos, validación y recursos ausentes se traducen a `409`, `400` y `404` respectivamente.
 
 ## Límites actuales

@@ -1,9 +1,19 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
+import type { EntityRecord } from "../domain/entity";
 import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
-import { BadRequestError, readJson, sendEmpty, sendJson } from "../http";
+import type { DomainResponse } from "../domain/response";
+import { BadRequestError, parseJson, readBody, sendEmpty, sendJson } from "../http";
 
-export type RequestContext = { request: IncomingMessage; response: ServerResponse; domainRequest?: DomainRequest };
+type HttpInput = { method: string; url: string; body?: string };
+export type RequestContext = {
+  request: IncomingMessage;
+  response: ServerResponse;
+  httpInput?: HttpInput;
+  domainRequest?: DomainRequest;
+  domainResponse?: DomainResponse;
+  requestRecord?: EntityRecord;
+};
 export type Middleware = (context: RequestContext, next: () => Promise<void>) => Promise<void>;
 
 export function compose(middlewares: Middleware[]): (context: RequestContext) => Promise<void> {
@@ -18,34 +28,35 @@ export function compose(middlewares: Middleware[]): (context: RequestContext) =>
   };
 }
 
-/** Converts errors from any later middleware into the public HTTP error contract. */
-export function errorMiddleware(): Middleware {
+/** The only middleware that understands Node's HTTP request/response objects. */
+export function httpAdapterMiddleware(): Middleware {
   return async (context, next) => {
     try {
+      const method = context.request.method ?? "GET";
+      context.httpInput = { method, url: context.request.url ?? "/", body: writesBody(method) ? await readBody(context.request) : undefined };
       await next();
     } catch (error) {
-      if (error instanceof EntityNotFoundError) return sendJson(context.response, 404, { error: error.message });
-      if (error instanceof EntityConflictError) return sendJson(context.response, 409, { error: error.message });
-      if (error instanceof ValidationError || error instanceof BadRequestError) return sendJson(context.response, 400, { error: error.message });
-      return sendJson(context.response, 500, { error: "Internal server error" });
+      context.domainResponse = errorResponse(error);
     }
+    writeHttpResponse(context.response, context.domainResponse ?? { status: 500, body: { error: "Internal server error" } });
   };
 }
 
-/** Captures the `/vN/:entity/:id?` route as a generic domain request. */
+/** Captures the `/vN/:entity/:id?` route as a transport-neutral DomainRequest. */
 export function restPatternMiddleware(runtime: EntityRuntime): Middleware {
   return async (context, next) => {
-    const route = matchRoute(context.request.url ?? "/");
-    if (!route) return sendJson(context.response, 404, { error: "Route not found" });
-    if (!runtime.has(route.entityName)) return sendJson(context.response, 404, { error: "Entity not found" });
-    const action = actionFor(context.request.method ?? "GET", route.id);
-    if (!action) return sendJson(context.response, 405, { error: "Method not allowed" });
+    const input = requireHttpInput(context);
+    const route = matchRoute(input.url);
+    if (!route) throw new EntityNotFoundError("Route not found");
+    if (!runtime.has(route.entityName)) throw new EntityNotFoundError("Entity not found");
+    const action = actionFor(input.method, route.id);
+    if (!action) throw new MethodNotAllowedError();
     context.domainRequest = { ...route, action };
     await next();
   };
 }
 
-/** Captures a single object or a list payload without leaking the raw HTTP body. */
+/** Captures a single object or list payload, without passing an HTTP body into the domain. */
 export function payloadPatternMiddleware(runtime: EntityRuntime): Middleware {
   return async (context, next) => {
     const domainRequest = context.domainRequest;
@@ -53,26 +64,98 @@ export function payloadPatternMiddleware(runtime: EntityRuntime): Middleware {
     if (domainRequest.action === "update" || domainRequest.action === "replace") {
       runtime.assertRecord(domainRequest.entityName, domainRequest.id);
     }
-    const payload = capturePayload(await readJson(context.request));
-    if (domainRequest.action !== "create" && payload.kind === "many") {
-      throw new ValidationError("Only POST collection routes accept a list payload");
-    }
+    const rawBody = requireHttpInput(context).body;
+    const payload = capturePayload(rawBody === undefined ? undefined : parseJson(rawBody));
+    if (domainRequest.action !== "create" && payload.kind === "many") throw new ValidationError("Only POST collection routes accept a list payload");
     domainRequest.payload = payload;
     if (domainRequest.action === "create" && payload.kind === "many") domainRequest.action = "bulkCreate";
     await next();
   };
 }
 
-/** Applies schema filtering, repository CRUD and entity lifecycle business rules. */
+/** Stores the normalized request in the system `requests` repository. */
+export function requestRepositoryMiddleware(runtime: EntityRuntime): Middleware {
+  return async (context, next) => {
+    const request = context.domainRequest;
+    if (!request) return next();
+    const record = await runtime.execute({
+      apiVersion: request.apiVersion,
+      entityName: "requests",
+      action: "create",
+      payload: {
+        kind: "one",
+        value: {
+          apiVersion: request.apiVersion,
+          entityName: request.entityName,
+          action: request.action,
+          ...(request.id ? { id: request.id } : {}),
+          ...(request.payload ? { payload: request.payload } : {})
+        }
+      }
+    });
+    context.requestRecord = record as EntityRecord;
+    await next();
+  };
+}
+
+/** Stores every matched request's normalized response in the `responses` repository. */
+export function responseRepositoryMiddleware(runtime: EntityRuntime): Middleware {
+  return async (context, next) => {
+    try {
+      await next();
+    } catch (error) {
+      context.domainResponse = errorResponse(error);
+    }
+    const response = context.domainResponse ?? { status: 500, body: { error: "Internal server error" } };
+    await runtime.execute({
+      apiVersion: context.domainRequest?.apiVersion ?? "v1",
+      entityName: "responses",
+      action: "create",
+      payload: {
+        kind: "one",
+        value: {
+          ...(context.requestRecord?.id ? { requestId: context.requestRecord.id } : {}),
+          status: response.status,
+          ...(response.body === undefined ? {} : { body: response.body })
+        }
+      }
+    });
+  };
+}
+
+/** Executes domain CRUD and returns a normalized response rather than writing HTTP. */
 export function entityLifecycleMiddleware(runtime: EntityRuntime): Middleware {
   return async (context) => {
-    const domainRequest = context.domainRequest;
-    if (!domainRequest) return;
-    const result = await runtime.execute(domainRequest);
-    if (domainRequest.action === "delete") return sendEmpty(context.response, 204);
-    if (domainRequest.action === "bulkCreate") return sendJson(context.response, 201, { items: result });
-    return sendJson(context.response, domainRequest.action === "create" ? 201 : 200, result);
+    const request = context.domainRequest;
+    if (!request) return;
+    const result = await runtime.execute(request);
+    if (request.action === "delete") return setResponse(context, 204);
+    if (request.action === "bulkCreate") return setResponse(context, 201, { items: result });
+    setResponse(context, request.action === "create" ? 201 : 200, result);
   };
+}
+
+function setResponse(context: RequestContext, status: number, body?: unknown): void {
+  context.domainResponse = { status, body };
+}
+
+function requireHttpInput(context: RequestContext): HttpInput {
+  if (!context.httpInput) throw new Error("HTTP adapter has not run");
+  return context.httpInput;
+}
+
+function errorResponse(error: unknown): DomainResponse {
+  if (error instanceof EntityNotFoundError) return { status: 404, body: { error: error.message } };
+  if (error instanceof EntityConflictError) return { status: 409, body: { error: error.message } };
+  if (error instanceof MethodNotAllowedError) return { status: 405, body: { error: error.message } };
+  if (error instanceof ValidationError || error instanceof BadRequestError) return { status: 400, body: { error: error.message } };
+  return { status: 500, body: { error: "Internal server error" } };
+}
+
+function writeHttpResponse(response: ServerResponse, domain: DomainResponse): void {
+  for (const [name, value] of Object.entries(domain.headers ?? {})) response.setHeader(name, value);
+  if (domain.body === undefined) return sendEmpty(response, domain.status);
+  sendJson(response, domain.status, domain.body);
 }
 
 function matchRoute(url: string): Pick<DomainRequest, "apiVersion" | "entityName" | "id"> | undefined {
@@ -91,10 +174,7 @@ function actionFor(method: string, id?: string): CrudAction | undefined {
   if (id && method === "DELETE") return "delete";
 }
 
-function requiresBody(action: CrudAction): boolean {
-  return action === "create" || action === "replace" || action === "update";
-}
-
-function capturePayload(body: unknown): PayloadPattern {
-  return Array.isArray(body) ? { kind: "many", values: body } : { kind: "one", value: body };
-}
+function writesBody(method: string): boolean { return method === "POST" || method === "PUT" || method === "PATCH"; }
+function requiresBody(action: CrudAction): boolean { return action === "create" || action === "replace" || action === "update"; }
+function capturePayload(body: unknown): PayloadPattern { return Array.isArray(body) ? { kind: "many", values: body } : { kind: "one", value: body }; }
+class MethodNotAllowedError extends Error { constructor() { super("Method not allowed"); } }

@@ -1,4 +1,4 @@
-export type ScalarType = "string" | "number" | "boolean";
+export type ScalarType = "string" | "number" | "boolean" | "json";
 
 export interface FieldDefinition {
   type: ScalarType;

@@ -7,7 +7,7 @@ export function parseTypeDefinition(source: string): Record<string, FieldDefinit
 
   const fields: Record<string, FieldDefinition> = {};
   for (const declaration of body.split(/[;,\n]/).map((part) => part.trim()).filter(Boolean)) {
-    const match = declaration.match(/^(\w+)(\?)?\s*:\s*(string|number|boolean)$/);
+    const match = declaration.match(/^(\w+)(\?)?\s*:\s*(string|number|boolean|json)$/);
     if (!match) throw new ValidationError(`Unsupported field declaration: ${declaration}`);
     fields[match[1]] = { type: match[3] as ScalarType, required: !match[2] };
   }
@@ -27,7 +27,7 @@ export function validateRecord(
   for (const [name, value] of Object.entries(record)) {
     const field = fields[name];
     if (!field) throw new ValidationError(`Unknown field: ${name}`);
-    if (typeof value !== field.type) throw new ValidationError(`Field ${name} must be ${field.type}`);
+    if (!hasExpectedType(value, field.type)) throw new ValidationError(`Field ${name} must be ${field.type}`);
   }
   if (!partial) {
     for (const [name, field] of Object.entries(fields)) {
@@ -35,6 +35,11 @@ export function validateRecord(
     }
   }
   return record;
+}
+
+function hasExpectedType(value: unknown, type: ScalarType): boolean {
+  if (type === "json") return value === null || ["string", "number", "boolean", "object"].includes(typeof value);
+  return typeof value === type;
 }
 
 export class ValidationError extends Error {}
