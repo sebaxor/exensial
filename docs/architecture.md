@@ -14,6 +14,25 @@ PATCH /v1/acme.work/tasks/:id        -> update a record
 DELETE /v1/acme.work/tasks/:id       -> delete a record
 ```
 
+## Layering and reuse
+
+The system is intentionally layered. A layer may use the layer below it, but no lower layer knows a domain such as a library, books, or loans.
+
+```text
+HTTP adapter
+  -> generic REST pattern and CRUD runtime
+    -> ordinary repositories
+      -> system entities: requests, responses, entities
+        -> runtime-defined entities and their declarative logic
+```
+
+- The generic CRUD runtime owns validation, repositories, and the standard REST operations. It has no domain-specific names.
+- `requests` and `responses` are ordinary audit entities using that same runtime.
+- `entities` is another ordinary system entity. Its records are entity definitions; its lifecycle installs, replaces, or removes an entity in the runtime. It does not contain book, loan, or application-specific rules.
+- A dynamic entity can include `logic`. Those rules are stored in its `entities` record and are interpreted on top of generic CRUD. The library example is therefore runtime data, not production source code.
+
+The only fixed code above generic CRUD is the reusable interpreter for the supported rule vocabulary. It does not name or assume any business entity; it receives names such as `books` only from a runtime entity definition.
+
 ## Request pipeline
 
 ```text
