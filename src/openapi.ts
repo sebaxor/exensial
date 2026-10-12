@@ -8,7 +8,11 @@ export function createOpenApi(definitions: EntityDefinition[]): Record<string, u
   const paths = Object.assign({}, ...definitions.map((definition) => entityPaths(definition)));
   return {
     openapi: "3.0.4",
-    info: { title: "ZFC Dynamic API", version: "1.0.0", description: "Runtime-defined entities exposed through REST." },
+    info: {
+      title: "Exensial API",
+      version: "1.0.0",
+      description: entityCatalogGuide()
+    },
     paths,
     components: { schemas }
   };
@@ -78,3 +82,27 @@ function operation(summary: string, definition: EntityDefinition, responses: Rec
 function jsonContent(schema: Schema): Schema { return { "application/json": { schema } }; }
 function errorResponse(): Schema { return { description: "Not found", content: jsonContent({ type: "object", properties: { error: { type: "string" } }, required: ["error"] }) }; }
 function text(localized?: LocalizedText): string | undefined { return localized?.en ?? Object.values(localized ?? {})[0]; }
+
+function entityCatalogGuide(): string {
+  return `## Entidades dinámicas
+
+Usa **POST /v1/entities** para convertir un alias TypeScript en un recurso REST. Por ejemplo:
+
+\`\`\`json
+{
+  "name": "tasks",
+  "namespace": "acme.work",
+  "definition": "type Task = { title: string; completed?: boolean }"
+}
+\`\`\`
+
+El resultado expone automáticamente \`GET/POST /v1/tasks\` y \`GET/PUT/PATCH/DELETE /v1/tasks/{id}\`.
+
+### Documentación y localización
+
+Incluye JSDoc con \`@zfc.title <locale> <texto>\` y \`@zfc.description <locale> <texto>\` antes del tipo o de cada campo. Swagger muestra el idioma principal y conserva todos los idiomas en \`x-zfc-localized\`.
+
+### Lógica de negocio
+
+\`module\` solo acepta ids de módulos confiables registrados por el servidor. Esos módulos pueden interceptar \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\` y \`delete\`. Con \`await next()\` complementan el CRUD base; sin \`next()\`, lo reemplazan asignando \`context.result\`. Nunca se ejecuta código enviado por HTTP.`;
+}

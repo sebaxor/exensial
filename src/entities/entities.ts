@@ -5,13 +5,20 @@ import type { EntityBehaviorRegistry } from "../application/entity-behaviors";
 
 const definition = {
   name: "entities",
+  documentation: {
+    title: { en: "Entity catalog", es: "Catálogo de entidades" },
+    description: {
+      en: "Creates, updates, and removes runtime REST entities from TypeScript type aliases.",
+      es: "Crea, actualiza y elimina entidades REST en runtime a partir de alias de tipo TypeScript."
+    }
+  },
   fields: {
-    name: { type: "string", required: true },
-    definition: { type: "string", required: true },
-    namespace: { type: "string", required: false },
-    module: { type: "string", required: false }
+    name: { type: "string", required: true, documentation: { title: { en: "Route name", es: "Nombre de ruta" } } },
+    definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type", es: "Tipo TypeScript" } } },
+    namespace: { type: "string", required: false, documentation: { title: { en: "Logical namespace", es: "Namespace lógico" } } },
+    module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module", es: "Módulo de comportamiento confiable" } } }
   }
-} as const;
+} satisfies EntityModule["definition"];
 
 function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehaviorRegistry): EntityModule {
   const parsed = parseEntitySource(record.definition);

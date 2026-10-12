@@ -87,6 +87,9 @@ test("generates localized OpenAPI documentation from JSDoc entity metadata", asy
     const definition = `/**\n * @zfc.title en Products\n * @zfc.title es Productos\n * @zfc.description en A product catalog\n */\ntype Product = {\n  /** @zfc.title en Title */\n  name: string;\n}`;
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "documented-products", definition }) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.equal(openapi.info.title, "Exensial API");
+    assert.match(openapi.info.description, /Entidades dinámicas/);
+    assert.equal(openapi.components.schemas.entities.title, "Entity catalog");
     const schema = openapi.components.schemas["documented-products"];
     assert.equal(schema.title, "Products");
     assert.equal(schema["x-zfc-localized"].title.es, "Productos");

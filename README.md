@@ -43,4 +43,6 @@ La especificación dinámica está en `/openapi.json` y la interfaz Swagger est�
 
 El catálogo de entidades puede desactivarse al iniciar: `EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start`. En ese modo, `/v1/entities` no está disponible y solo quedan los módulos instalados explícitamente por la aplicación.
 
+La guía práctica para definir tipos, localización, namespaces y lógica de negocio está en [docs/entities.md](docs/entities.md).
+
 Consulta [la arquitectura y las decisiones técnicas](docs/architecture.md) para el diseño completo.
