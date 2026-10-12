@@ -3,6 +3,7 @@ import { parseEntitySource, ValidationError } from "../domain/schema";
 import { EntityConflictError, type EntityModule, type EntityRuntime } from "../application/entity-runtime";
 import type { EntityBehaviorRegistry } from "../application/entity-behaviors";
 import { compileRuntimeLogic } from "../application/runtime-logic";
+import { compileRuntimeCode } from "../application/runtime-code";
 
 const definition = {
   name: "entities",
@@ -18,7 +19,8 @@ const definition = {
     namespace: { type: "string", required: false, documentation: { title: { en: "Namespace" } } },
     module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" } } },
     behavior: { type: "json", required: false, documentation: { title: { en: "Behavior configuration" } } },
-    logic: { type: "json", required: false, documentation: { title: { en: "Runtime business logic" } } }
+    logic: { type: "json", required: false, documentation: { title: { en: "Declarative business logic" } } },
+    code: { type: "string", required: false, documentation: { title: { en: "Runtime TypeScript domain module" } } }
   }
 } satisfies EntityModule["definition"];
 
@@ -28,6 +30,7 @@ function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehavior
   if (record.module && !behavior) throw new ValidationError(`Unknown behavior module: ${record.module}`);
   behavior?.validateConfiguration?.(record.behavior);
   const logic = compileRuntimeLogic(record.logic);
+  const code = compileRuntimeCode(record.code);
   return {
     definition: {
       name: record.name,
@@ -38,11 +41,25 @@ function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehavior
         module: record.module,
         behavior: record.behavior,
         logic: record.logic,
-        operations: [...Object.keys(behavior?.operations ?? {}), ...Object.keys(logic ?? {})]
+        code: record.code,
+        operations: [...new Set([...Object.keys(behavior?.operations ?? {}), ...Object.keys(logic ?? {}), ...Object.keys(code ?? {})])]
       }
     },
-    operations: { ...behavior?.operations, ...logic }
+    operations: mergeOperations(behavior?.operations, logic, code)
   };
+}
+
+function mergeOperations(...sources: Array<EntityModule["operations"] | undefined>): EntityModule["operations"] {
+  const result: NonNullable<EntityModule["operations"]> = {};
+  for (const source of sources) {
+    for (const [action, operation] of Object.entries(source ?? {})) {
+      const existing = result[action as keyof typeof result];
+      result[action as keyof typeof result] = existing
+        ? [...(Array.isArray(existing) ? existing : [existing]), ...(Array.isArray(operation) ? operation : [operation])]
+        : operation;
+    }
+  }
+  return result;
 }
 
 /** System entity: each record deploys a regular dynamic entity. */

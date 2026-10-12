@@ -115,6 +115,21 @@ The supported rule types are:
 
 For a compact, complete runtime example with copies and loans, see the [library circulation lab](labs/library.md). It presents the domain definition first and the installation curls separately.
 
+## Runtime TypeScript domain code
+
+When a workflow cannot be expressed by the reusable `logic` vocabulary, the entity request may include a `code` string containing a TypeScript module. It must `export default` an object whose keys are CRUD operations. Each function receives a domain context and `next`, exactly like middleware: mutate `context.input` or check records before `await next()`, then react to completed generic CRUD afterwards.
+
+```ts
+export default {
+  create: async (context, next) => {
+    context.input.title = String(context.input.title).trim();
+    await next();
+  }
+};
+```
+
+The context provides `records.get/create/update/remove` for other entities and `fail(message)` for a business rejection. It does not expose HTTP requests, responses, repositories, filesystem, or database drivers. This keeps domain source independent from the current in-memory repository. Read [runtime TypeScript domain modules](runtime-code.md) for the full contract and development-only security limitation.
+
 The following is a deliberately explicit, low-level example built from `lookup`, `assert`, and `patch`. It remains useful when a domain needs custom composition. The [library circulation lab](labs/library.md) uses the compact `reserve`, `release`, and `transition` vocabulary instead.
 
 ```json

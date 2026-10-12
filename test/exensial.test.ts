@@ -155,6 +155,63 @@ test("binds trusted operation middleware to a runtime-defined entity", async () 
   }, { behaviorModules: [normalizeTitle] });
 });
 
+test("installs a TypeScript domain module received through the entity endpoint", async () => {
+  await withApi(async (baseUrl) => {
+    const post = (path: string, body: unknown) => fetch(`${baseUrl}${path}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+    });
+    await post("/v1/entities", {
+      name: "books", namespace: "coded-library",
+      definition: "type Book = { title: string; copiesAvailable: number }"
+    });
+    const book = await (await post("/v1/coded-library/books", { title: "Runtime code", copiesAvailable: 1 })).json();
+    const code = `
+      type Context = {
+        input?: Record<string, unknown>;
+        current?: Record<string, unknown>;
+        records: {
+          get(name: string, id: string, namespace?: string): Record<string, unknown> | undefined;
+          update(name: string, id: string, changes: Record<string, unknown>, namespace?: string): Promise<Record<string, unknown>>;
+        };
+        fail(message: string): never;
+      };
+      export default {
+        create: async (context: Context, next: () => Promise<void>) => {
+          const input = context.input!;
+          input.memberId = String(input.memberId).trim().toLowerCase();
+          const book = context.records.get("books", String(input.bookId), "coded-library");
+          if (!book || Number(book.copiesAvailable) < 1) context.fail("Book is not available");
+          await context.records.update("books", String(input.bookId), { copiesAvailable: Number(book.copiesAvailable) - 1 }, "coded-library");
+          input.status = "active";
+          await next();
+        },
+        update: async (context: Context, next: () => Promise<void>) => {
+          if (context.current?.status !== "active" || context.input?.status !== "returned") context.fail("Only active loans may be returned");
+          await next();
+          const book = context.records.get("books", String(context.current?.bookId), "coded-library")!;
+          await context.records.update("books", String(book.id), { copiesAvailable: Number(book.copiesAvailable) + 1 }, "coded-library");
+        }
+      };
+    `;
+    const definition = await post("/v1/entities", {
+      name: "loans", namespace: "coded-library",
+      definition: "type Loan = { bookId: string; memberId: string; status?: string }",
+      code
+    });
+    assert.equal(definition.status, 201);
+    const loanResponse = await post("/v1/coded-library/loans", { bookId: book.id, memberId: " ANA " });
+    const loan = await loanResponse.json();
+    assert.equal(loanResponse.status, 201);
+    assert.deepEqual({ memberId: loan.memberId, status: loan.status }, { memberId: "ana", status: "active" });
+    assert.equal((await (await fetch(`${baseUrl}/v1/coded-library/books/${book.id}`)).json()).copiesAvailable, 0);
+    assert.equal((await post("/v1/coded-library/loans", { bookId: book.id, memberId: "mateo" })).status, 400);
+    assert.equal((await fetch(`${baseUrl}/v1/coded-library/loans/${loan.id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "returned" })
+    })).status, 200);
+    assert.equal((await (await fetch(`${baseUrl}/v1/coded-library/books/${book.id}`)).json()).copiesAvailable, 1);
+  });
+});
+
 test("allows equal entity names in separate namespaces", async () => {
   await withApi(async (baseUrl) => {
     for (const namespace of ["acme.sales", "acme.support"]) {

@@ -23,13 +23,13 @@ HTTP adapter
   -> generic REST pattern and CRUD runtime
     -> ordinary repositories
       -> system entities: requests, responses, entities
-        -> runtime-defined entities and their declarative logic
+        -> runtime-defined entities and their declarative logic or domain code
 ```
 
 - The generic CRUD runtime owns validation, repositories, and the standard REST operations. It has no domain-specific names.
 - `requests` and `responses` are ordinary audit entities using that same runtime.
 - `entities` is another ordinary system entity. Its records are entity definitions; its lifecycle installs, replaces, or removes an entity in the runtime. It does not contain book, loan, or application-specific rules.
-- A dynamic entity can include `logic`. Those rules are stored in its `entities` record and are interpreted on top of generic CRUD. The library example is therefore runtime data, not production source code.
+- A dynamic entity can include declarative `logic` and/or TypeScript `code`. Both are stored in its `entities` record and installed on top of generic CRUD. The library example is therefore runtime data, not production source code.
 
 The only fixed code above generic CRUD is the reusable interpreter for the supported rule vocabulary. It does not name or assume any business entity; it receives names such as `books` only from a runtime entity definition.
 
@@ -64,13 +64,15 @@ The identity is `(namespace, name)`. The runtime uses that pair internally, whic
 
 The system `entities` module is itself an ordinary CRUD entity with extra lifecycle rules. Creating a definition validates its type alias and installs a new module. Updating a definition replaces its schema while retaining its repository. Deleting it removes the installed entity and its endpoint. The catalog is installed only when `EXENSIAL_ENABLE_ENTITY_CATALOG` is not `false`, or when `createApp({ enableEntityCatalog: true })` is used.
 
-## Runtime business logic
+## Runtime business logic and code
 
 An entity definition may include a declarative `logic` object. The entity catalog validates and compiles it into operation middleware at runtime, so the schema and business rules arrive in the same HTTP request. Rules are deliberately high-level: validate a value, compare dates, look up a related record, set an input field, patch another entity, or reject the operation. They have `before`, `after`, and `onError` phases around generic CRUD.
 
-This is not arbitrary uploaded JavaScript. The interpreter remains infrastructure code, while each entity's definition describes business intent without access to HTTP objects, repositories, filesystem, or process APIs. For example, a loan definition can look up a book, require availability, set a loan status, and change the book's availability using only JSON rules. See [the entity authoring guide](entities.md) for the complete definition.
+The declarative path is not arbitrary uploaded JavaScript. Its interpreter remains infrastructure code, while each entity's definition describes business intent without access to HTTP objects, repositories, filesystem, or process APIs. For example, a loan definition can look up a book, require availability, set a loan status, and change the book's availability using only JSON rules. See [the entity authoring guide](entities.md) for the complete definition.
 
-Code-defined middleware remains available for application-level extensions, but runtime entities do not require it for the supported declarative rule set.
+An entity can additionally send a `code` string containing a TypeScript module with `export default { create, update, ... }`. It compiles to the same operation-middleware contract as `logic`, but receives only a domain facade: input/current/result, `fail`, and record operations on other entities. The facade contains no HTTP request, response, repository, or database objects. Therefore source can survive a later replacement of the in-memory repository by a table repository.
+
+In this MVP the TypeScript executor is deliberately a controlled-development capability, not a security sandbox. It must not be reachable by untrusted callers. See [runtime TypeScript domain modules](runtime-code.md) for its contract and persistence/transaction limitations.
 
 ## Type aliases and documentation
 
