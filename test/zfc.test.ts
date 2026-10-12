@@ -100,6 +100,12 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.equal(schema.title, "Products");
     assert.equal(schema["x-exensial-localized"].title.es, "Productos");
     assert.ok(openapi.paths["/v1/documented-products"]);
+    const collection = openapi.paths["/v1/documented-products"];
+    assert.equal(collection.get.operationId, "listDocumentedProducts");
+    assert.match(collection.get.description, /Returns every record/);
+    assert.deepEqual(collection.post.requestBody.content["application/json"].examples.one.value, { name: "Example name" });
+    assert.deepEqual(collection.get.responses[200].content["application/json"].example, [{ id: "550e8400-e29b-41d4-a716-446655440000", name: "Example name" }]);
+    assert.match(openapi.paths["/v1/documented-products/{id}"].patch.description, /Updates only the supplied fields/);
     assert.match(await (await fetch(`${baseUrl}/docs`)).text(), /SwaggerUIBundle/);
   });
 });

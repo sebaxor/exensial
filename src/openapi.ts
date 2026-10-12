@@ -53,37 +53,94 @@ function entityPaths(definition: EntityDefinition): Record<string, unknown> {
   const namespace = definition.context?.namespace;
   const collectionPath = `/v1/${namespace ? `${namespace}/` : ""}${definition.name}`;
   const itemPath = `${collectionPath}/{id}`;
+  const input = inputExample(definition);
+  const record = { id: exampleId(), ...input };
+  const bulkInput = [input, inputExample(definition, 2)];
+  const partialInput = partialExample(definition);
   return {
     [collectionPath]: {
-      get: operation(`List ${definition.name}`, definition, { 200: { description: "Collection", content: jsonContent({ type: "array", items: reference }) } }),
-      post: operation(`Create or import ${definition.name}`, definition, {
-        201: { description: "Created", content: jsonContent({ oneOf: [reference, { type: "object", properties: { items: { type: "array", items: reference } }, required: ["items"] }] }) }
-      }, { oneOf: [reference, { type: "array", items: reference }] })
+      get: operation(definition, "list", `List ${definition.name}`, "Returns every record currently held by this entity.", {
+        200: { description: "Collection returned", content: jsonContent({ type: "array", items: reference }, [record]) }
+      }),
+      post: operation(definition, "create", `Create or import ${definition.name}`, "Send one object to create one record, or an array of objects to import records in bulk.", {
+        201: {
+          description: "Record or bulk import created",
+          content: jsonContent({ oneOf: [reference, { type: "object", properties: { items: { type: "array", items: reference } }, required: ["items"] }] }, record)
+        },
+        400: validationErrorResponse()
+      }, jsonExamples({ oneOf: [reference, { type: "array", items: reference }] }, {
+        one: { summary: "Create one record", value: input },
+        many: { summary: "Import multiple records", value: bulkInput }
+      }))
     },
     [itemPath]: {
-      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-      get: operation(`Get ${definition.name}`, definition, { 200: { description: "Record", content: jsonContent(reference) }, 404: errorResponse() }),
-      put: operation(`Replace ${definition.name}`, definition, { 200: { description: "Replaced", content: jsonContent(reference) }, 404: errorResponse() }, reference),
-      patch: operation(`Update ${definition.name}`, definition, { 200: { description: "Updated", content: jsonContent(reference) }, 404: errorResponse() }, reference),
-      delete: operation(`Delete ${definition.name}`, definition, { 204: { description: "Deleted" }, 404: errorResponse() })
+      parameters: [{ name: "id", in: "path", required: true, description: "Record identifier returned by a create operation.", schema: { type: "string", format: "uuid" }, example: exampleId() }],
+      get: operation(definition, "get", `Get ${definition.name}`, "Returns one record by id.", { 200: { description: "Record returned", content: jsonContent(reference, record) }, 404: errorResponse() }),
+      put: operation(definition, "replace", `Replace ${definition.name}`, "Replaces a record. Include every required field declared by the entity.", {
+        200: { description: "Record replaced", content: jsonContent(reference, record) }, 400: validationErrorResponse(), 404: errorResponse()
+      }, jsonContent(reference, input)),
+      patch: operation(definition, "update", `Update ${definition.name}`, "Updates only the supplied fields; required fields may be omitted.", {
+        200: { description: "Record updated", content: jsonContent(reference, { ...record, ...partialInput }) }, 400: validationErrorResponse(), 404: errorResponse()
+      }, jsonContent(reference, partialInput)),
+      delete: operation(definition, "delete", `Delete ${definition.name}`, "Permanently removes one record by id.", { 204: { description: "Record deleted" }, 404: errorResponse() })
     }
   };
 }
 
-function operation(summary: string, definition: EntityDefinition, responses: Record<string | number, unknown>, requestSchema?: Schema): Schema {
+function operation(
+  definition: EntityDefinition,
+  action: string,
+  summary: string,
+  detail: string,
+  responses: Record<string | number, unknown>,
+  requestContent?: Schema
+): Schema {
   return {
-    tags: [definition.name],
+    tags: [schemaKey(definition)],
+    operationId: `${action}${identifier(schemaKey(definition))}`,
     summary,
-    description: text(definition.documentation?.description),
-    ...(requestSchema ? { requestBody: { required: true, content: jsonContent(requestSchema) } } : {}),
+    description: [text(definition.documentation?.description), detail].filter(Boolean).join("\n\n"),
+    ...(requestContent ? { requestBody: { required: true, content: requestContent } } : {}),
     responses
   };
 }
 
-function jsonContent(schema: Schema): Schema { return { "application/json": { schema } }; }
-function errorResponse(): Schema { return { description: "Not found", content: jsonContent({ type: "object", properties: { error: { type: "string" } }, required: ["error"] }) }; }
+function jsonContent(schema: Schema, example?: unknown): Schema {
+  return { "application/json": { schema, ...(example === undefined ? {} : { example }) } };
+}
+function jsonExamples(schema: Schema, examples: Record<string, { summary: string; value: unknown }>): Schema {
+  return { "application/json": { schema, examples } };
+}
+function errorResponse(): Schema { return { description: "Record not found", content: jsonContent({ type: "object", properties: { error: { type: "string" } }, required: ["error"] }, { error: "Record not found" }) }; }
+function validationErrorResponse(): Schema { return { description: "Request does not match the entity schema", content: jsonContent({ type: "object", properties: { error: { type: "string" } }, required: ["error"] }, { error: "Missing required field: title" }) }; }
 function text(localized?: LocalizedText): string | undefined { return localized?.en ?? Object.values(localized ?? {})[0]; }
 function schemaKey(definition: EntityDefinition): string { return definition.context?.namespace ? `${definition.context.namespace}.${definition.name}` : definition.name; }
+function identifier(value: string): string { return value.replace(/[^a-zA-Z0-9]+(.)?/g, (_match, next?: string) => next?.toUpperCase() ?? "").replace(/^./, (first) => first.toUpperCase()); }
+
+function inputExample(definition: EntityDefinition, index = 1): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(definition.fields).map(([name, field]) => [name, fieldExample(name, field, index)]));
+}
+
+function partialExample(definition: EntityDefinition): Record<string, unknown> {
+  const [name, field] = Object.entries(definition.fields)[0] ?? [];
+  return name && field ? { [name]: fieldExample(name, field, 2) } : {};
+}
+
+function fieldExample(name: string, field: FieldDefinition, index: number): unknown {
+  if (field.type === "number") return index === 1 ? 42 : 84;
+  if (field.type === "boolean") return index % 2 === 1;
+  if (field.type === "json") return { example: true, sequence: index };
+  if (name.endsWith("At")) return "2026-10-12T12:00:00.000Z";
+  if (name.toLowerCase().includes("email")) return "person@example.com";
+  if (name === "apiVersion") return "v1";
+  if (name === "action") return "create";
+  if (name === "entityName") return "tasks";
+  if (name === "namespace") return "acme.work";
+  if (name === "definition") return "type Task = { title: string; completed?: boolean }";
+  return `Example ${name}${index === 1 ? "" : ` ${index}`}`;
+}
+
+function exampleId(): string { return "550e8400-e29b-41d4-a716-446655440000"; }
 
 function entityCatalogGuide(): string {
   return `## Dynamic entities
@@ -104,7 +161,47 @@ This publishes \`GET/POST /v1/acme.work/tasks\` and \`GET/PUT/PATCH/DELETE /v1/a
 
 Add JSDoc with \`@exensial.title <locale> <text>\` and \`@exensial.description <locale> <text>\` before the type or a field. Swagger uses English when available and preserves all locales in \`x-exensial-localized\`.
 
+\`\`\`ts
+/**
+ * @exensial.title en Tasks
+ * @exensial.title es Tareas
+ * @exensial.description en Work tracked by a team
+ */
+type Task = {
+  /** @exensial.description en A concise task summary */
+  title: string;
+  completed?: boolean;
+}
+\`\`\`
+
+### CRUD conventions
+
+- **GET collection** lists records.
+- **POST collection** creates one object or imports an array of objects.
+- **GET item** reads one id.
+- **PUT item** replaces it with all required fields.
+- **PATCH item** updates only supplied fields.
+- **DELETE item** returns \`204 No Content\`.
+
+Every operation below includes generated request and response examples based on its active schema. The entity catalog itself is also an ordinary CRUD entity, so its examples show how to create new runtime resources.
+
 ### Business logic
 
-\`module\` accepts only trusted module ids registered by the server. Modules can intercept \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\`, and \`delete\`. Use \`await next()\` to extend base CRUD; omit it and assign \`context.result\` to replace it. HTTP never executes submitted code.`;
+\`module\` accepts only trusted module ids registered by the server. Modules can intercept \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\`, and \`delete\`. Use \`await next()\` to extend base CRUD; omit it and assign \`context.result\` to replace it. HTTP never executes submitted code.
+
+\`\`\`ts
+const normalizeTitle: EntityBehaviorModule = {
+  id: "library/normalize-title",
+  operations: {
+    create: async (context, next) => {
+      const input = context.input as Record<string, unknown>;
+      input.title = String(input.title).trim(); // before CRUD
+      await next();                             // generic repository CRUD
+      // context.result is available after CRUD
+    }
+  }
+};
+\`\`\`
+
+Select it while creating an entity with \`"module": "library/normalize-title"\`. The selected id must be registered by the application at startup.`;
 }

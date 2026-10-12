@@ -57,7 +57,7 @@ The parser deliberately accepts a narrow, declarative subset: fields of type `st
 
 `@exensial.title <locale> <text>` and `@exensial.description <locale> <text>` are parsed from JSDoc preceding the alias or a field. They are retained in `documentation`, emitted as `x-exensial-localized`, and used to generate standard English OpenAPI text when English is available.
 
-`GET /openapi.json` generates OpenAPI 3.0.4 from the current runtime. It includes active routes, schemas, localized metadata, and `x-exensial-context` containing namespace, module id, and intercepted operations. `GET /docs` serves Swagger UI over that generated document.
+`GET /openapi.json` generates OpenAPI 3.0.4 from the current runtime. It includes active routes, schemas, localized metadata, and `x-exensial-context` containing namespace, module id, and intercepted operations. Every generated CRUD operation has an `operationId`, a purpose-specific description, and schema-derived examples for requests and successful responses. Collection `POST` exposes separate examples for creating one record and importing a list; item operations show id, replacement, partial-update, and error examples. `GET /docs` serves Swagger UI over that generated document.
 
 ## Technical decisions and current limits
 
