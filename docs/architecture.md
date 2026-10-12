@@ -5,27 +5,32 @@
 ZFC expone conjuntos definidos en tiempo de ejecución como recursos REST. Un conjunto se crea enviando un alias de tipo TypeScript simplificado; una vez desplegado, recibe las rutas CRUD habituales sin añadir rutas manuales.
 
 ```text
-POST /entities             → define el conjunto `books`
-POST /books                → crea un elemento
-GET /books                 → lista elementos
-GET /books/:id             → obtiene un elemento
-PATCH /books/:id           → lo modifica
-DELETE /books/:id          → lo elimina
+POST /v1/entities          → define el conjunto `books`
+POST /v1/books             → crea un elemento o importa una lista
+GET /v1/books              → lista elementos
+GET /v1/books/:id          → obtiene un elemento
+PUT /v1/books/:id          → lo reemplaza
+PATCH /v1/books/:id        → lo modifica parcialmente
+DELETE /v1/books/:id       → lo elimina
 ```
 
 ## Flujo de una solicitud
 
 ```text
 HTTP request
-  → restOperationMiddleware
+  → errorMiddleware
+  → restPatternMiddleware
+  → payloadPatternMiddleware
   → entityLifecycleMiddleware
   → EntityRuntime
   → Repository
 ```
 
-`restOperationMiddleware` interpreta `/:entity/:id?`, comprueba que la entidad existe y traduce método y URL a una operación CRUD. Una entidad inexistente falla ahí con `404`.
+`restPatternMiddleware` interpreta `/vN/:entity/:id?`, comprueba que la entidad existe y traduce método y URL a una operación CRUD. Produce una representación neutral al transporte (`DomainRequest`) con versión, entidad, id y acción. Una entidad inexistente falla ahí con `404`.
 
-`entityLifecycleMiddleware` lee el body cuando corresponde, ejecuta la operación y traduce los errores de dominio a HTTP. La prioridad para `PATCH` es resolver primero el recurso, para que un id ausente responda `404` aun si el body es inválido.
+`payloadPatternMiddleware` transforma el body en un patrón `one` (objeto) o `many` (array). Un array solo es válido para `POST` de colección y se convierte en `bulkCreate`. Los demás cuerpos de escritura son un único objeto. Así repositorios y hooks no reciben el request HTTP ni su body crudo.
+
+`entityLifecycleMiddleware` ejecuta la operación serializada. `errorMiddleware` traduce errores de dominio a HTTP. La prioridad para `PATCH` y `PUT` es resolver primero el recurso, para que un id ausente responda `404` aun si el body es inválido.
 
 `EntityRuntime` contiene el CRUD genérico. Valida los datos contra el esquema de la entidad y ejecuta hooks antes y después de crear, actualizar o borrar.
 
@@ -64,6 +69,22 @@ type Book = {
 ```
 
 Admite `string`, `number`, `boolean` y el indicador opcional `?`. No evalúa ni importa código recibido por HTTP: una definición enviada es declarativa, no ejecutable. Esto evita convertir el endpoint de definición en ejecución remota de código.
+
+## Contrato REST versionado
+
+La versión forma parte del patrón de URL: `/v1/:entity/:id?`. El runtime no mezcla versiones: hoy acepta el patrón `v` seguido por números y lo conserva en `DomainRequest` para que una futura capa pueda aplicar políticas o catálogos por versión.
+
+| Método y ruta | Acción normalizada | Body |
+| --- | --- | --- |
+| `GET /v1/books` | `list` | — |
+| `POST /v1/books` | `create` | objeto |
+| `POST /v1/books` | `bulkCreate` | array de objetos |
+| `GET /v1/books/:id` | `get` | — |
+| `PUT /v1/books/:id` | `replace` | objeto completo |
+| `PATCH /v1/books/:id` | `update` | objeto parcial |
+| `DELETE /v1/books/:id` | `delete` | — |
+
+La validación conserva solo el contrato declarado por la entidad y rechaza campos desconocidos o tipos inválidos antes de invocar el repositorio. Para importación masiva se validan todos los objetos antes de realizar la primera escritura.
 
 ## Entidades definidas en código
 

@@ -13,7 +13,7 @@ npm start
 Define un conjunto enviando un alias de tipo TypeScript (por ahora admite campos `string`, `number` y `boolean`):
 
 ```bash
-curl -X POST http://localhost:3000/entities \
+curl -X POST http://localhost:3000/v1/entities \
   -H 'content-type: application/json' \
   -d '{"name":"books","definition":"type Book = { title: string; pages: number; published?: boolean }"}'
 ```
@@ -22,15 +22,15 @@ Después, el nombre se convierte en el recurso REST:
 
 ```bash
 # Crear
-curl -X POST http://localhost:3000/books -H 'content-type: application/json' -d '{"title":"Dune","pages":412}'
+curl -X POST http://localhost:3000/v1/books -H 'content-type: application/json' -d '{"title":"Dune","pages":412}'
 
 # Listar / leer uno
-curl http://localhost:3000/books
-curl http://localhost:3000/books/:id
+curl http://localhost:3000/v1/books
+curl http://localhost:3000/v1/books/:id
 
 # Actualizar / borrar
-curl -X PATCH http://localhost:3000/books/:id -H 'content-type: application/json' -d '{"pages":500}'
-curl -X DELETE http://localhost:3000/books/:id
+curl -X PATCH http://localhost:3000/v1/books/:id -H 'content-type: application/json' -d '{"pages":500}'
+curl -X DELETE http://localhost:3000/v1/books/:id
 ```
 
 `entities` es también una entidad del sistema: su repositorio conserva las definiciones y sus hooks de ciclo de vida despliegan, actualizan o retiran las entidades dinámicas. Los datos son intencionalmente en memoria para este primer corte: al reiniciar el proceso se vacían.

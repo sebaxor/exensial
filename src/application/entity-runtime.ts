@@ -1,8 +1,7 @@
 import type { EntityDefinition, EntityRecord } from "../domain/entity";
+import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
 import { InMemoryRepository, type Repository } from "../domain/repository";
 import { ValidationError, validateRecord } from "../domain/schema";
-
-export type CrudAction = "create" | "list" | "get" | "update" | "delete";
 
 export interface EntityLifecycle {
   beforeCreate?(input: Record<string, unknown>): void | Promise<void>;
@@ -48,16 +47,18 @@ export class EntityRuntime {
     this.requireRecord(entity, id);
   }
 
-  async execute(entityName: string, action: CrudAction, id?: string, input?: unknown): Promise<EntityRecord | EntityRecord[] | undefined> {
-    const entity = this.entities.get(entityName);
+  async execute(request: DomainRequest): Promise<EntityRecord | EntityRecord[] | undefined> {
+    const entity = this.entities.get(request.entityName);
     if (!entity) throw new EntityNotFoundError("Entity not found");
-    switch (action) {
+    switch (request.action) {
       case "list": return entity.repository.findAll();
-      case "get": return this.requireRecord(entity, id);
-      case "create": return this.create(entity, input);
-      case "update": return this.update(entity, id, input);
+      case "get": return this.requireRecord(entity, request.id);
+      case "create": return this.create(entity, this.onePayload(request.payload));
+      case "bulkCreate": return this.createMany(entity, this.manyPayload(request.payload));
+      case "replace": return this.update(entity, request.id, this.onePayload(request.payload), false);
+      case "update": return this.update(entity, request.id, this.onePayload(request.payload), true);
       case "delete":
-        await this.delete(entity, id);
+        await this.delete(entity, request.id);
         return undefined;
     }
   }
@@ -70,9 +71,22 @@ export class EntityRuntime {
     return record;
   }
 
-  private async update(entity: ActiveEntity, id: string | undefined, input: unknown): Promise<EntityRecord> {
+  private async createMany(entity: ActiveEntity, inputs: unknown[]): Promise<EntityRecord[]> {
+    // Validate every imported record before the first write.
+    const records = inputs.map((input) => validateRecord(input, entity.definition.fields));
+    const created: EntityRecord[] = [];
+    for (const data of records) {
+      await entity.lifecycle?.beforeCreate?.(data);
+      const record = entity.repository.create(data as Omit<EntityRecord, "id">);
+      await entity.lifecycle?.afterCreate?.(record);
+      created.push(record);
+    }
+    return created;
+  }
+
+  private async update(entity: ActiveEntity, id: string | undefined, input: unknown, partial: boolean): Promise<EntityRecord> {
     const current = this.requireRecord(entity, id);
-    const changes = validateRecord(input, entity.definition.fields, true);
+    const changes = validateRecord(input, entity.definition.fields, partial);
     const next = { ...current, ...changes };
     await entity.lifecycle?.beforeUpdate?.(current, next);
     const record = entity.repository.update(current.id, changes as Partial<Omit<EntityRecord, "id">>);
@@ -93,6 +107,17 @@ export class EntityRuntime {
     const record = entity.repository.findById(id);
     if (!record) throw new EntityNotFoundError("Record not found");
     return record;
+  }
+
+  private onePayload(payload?: PayloadPattern): unknown {
+    if (payload?.kind !== "one") throw new ValidationError("Expected one JSON object");
+    return payload.value;
+  }
+
+  private manyPayload(payload?: PayloadPattern): unknown[] {
+    if (payload?.kind !== "many") throw new ValidationError("Expected an array of JSON objects");
+    if (!payload.values.length) throw new ValidationError("Bulk creation requires at least one record");
+    return payload.values;
   }
 }
 

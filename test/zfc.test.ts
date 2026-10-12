@@ -18,7 +18,7 @@ async function withApi(run: (baseUrl: string) => Promise<void>) {
 
 test("creates an entity from a TypeScript type and performs its CRUD", async () => {
   await withApi(async (baseUrl) => {
-    const entity = await fetch(`${baseUrl}/entities`, {
+    const entity = await fetch(`${baseUrl}/v1/entities`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -31,7 +31,7 @@ test("creates an entity from a TypeScript type and performs its CRUD", async () 
     assert.equal(entityRecord.name, "books");
     assert.ok(entityRecord.id);
 
-    const created = await fetch(`${baseUrl}/books`, {
+    const created = await fetch(`${baseUrl}/v1/books`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ title: "Dune", pages: 412 })
@@ -42,10 +42,10 @@ test("creates an entity from a TypeScript type and performs its CRUD", async () 
     assert.equal(book.pages, 412);
     assert.ok(book.id);
 
-    const listed = await fetch(`${baseUrl}/books`);
+    const listed = await fetch(`${baseUrl}/v1/books`);
     assert.deepEqual(await listed.json(), [book]);
 
-    const updated = await fetch(`${baseUrl}/books/${book.id}`, {
+    const updated = await fetch(`${baseUrl}/v1/books/${book.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pages: 500, published: true })
@@ -53,45 +53,70 @@ test("creates an entity from a TypeScript type and performs its CRUD", async () 
     assert.equal(updated.status, 200);
     assert.deepEqual(await updated.json(), { ...book, pages: 500, published: true });
 
-    const removed = await fetch(`${baseUrl}/books/${book.id}`, { method: "DELETE" });
+    const removed = await fetch(`${baseUrl}/v1/books/${book.id}`, { method: "DELETE" });
     assert.equal(removed.status, 204);
-    assert.deepEqual(await (await fetch(`${baseUrl}/books`)).json(), []);
+    assert.deepEqual(await (await fetch(`${baseUrl}/v1/books`)).json(), []);
   });
 });
 
 test("returns correct errors for duplicate entities and invalid record routes", async () => {
   await withApi(async (baseUrl) => {
     const entity = { name: "tasks", definition: "type Task = { title: string }" };
-    const createEntity = () => fetch(`${baseUrl}/entities`, {
+    const createEntity = () => fetch(`${baseUrl}/v1/entities`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(entity)
     });
     assert.equal((await createEntity()).status, 201);
     assert.equal((await createEntity()).status, 409);
-    assert.equal((await fetch(`${baseUrl}/tasks/missing`, {
+    assert.equal((await fetch(`${baseUrl}/v1/tasks/missing`, {
       method: "PATCH", headers: { "content-type": "application/json" }, body: "not json"
     })).status, 404);
-    assert.equal((await fetch(`${baseUrl}/tasks/missing/extra`)).status, 404);
+    assert.equal((await fetch(`${baseUrl}/v1/tasks/missing/extra`)).status, 404);
   });
 });
 
 test("updates and removes a dynamic entity through the same REST CRUD", async () => {
   await withApi(async (baseUrl) => {
-    const created = await fetch(`${baseUrl}/entities`, {
+    const created = await fetch(`${baseUrl}/v1/entities`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "notes", definition: "type Note = { body: string }" })
     });
     const entity = await created.json();
 
-    const updated = await fetch(`${baseUrl}/entities/${entity.id}`, {
+    const updated = await fetch(`${baseUrl}/v1/entities/${entity.id}`, {
       method: "PATCH", headers: { "content-type": "application/json" },
       body: JSON.stringify({ definition: "type Note = { body: string; pinned?: boolean }" })
     });
     assert.equal(updated.status, 200);
-    assert.equal((await fetch(`${baseUrl}/notes`, {
+    assert.equal((await fetch(`${baseUrl}/v1/notes`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: "Hello", pinned: true })
     })).status, 201);
 
-    assert.equal((await fetch(`${baseUrl}/entities/${entity.id}`, { method: "DELETE" })).status, 204);
-    assert.equal((await fetch(`${baseUrl}/notes`)).status, 404);
+    assert.equal((await fetch(`${baseUrl}/v1/entities/${entity.id}`, { method: "DELETE" })).status, 204);
+    assert.equal((await fetch(`${baseUrl}/v1/notes`)).status, 404);
+  });
+});
+
+test("captures versioned REST patterns and bulk-import payloads", async () => {
+  await withApi(async (baseUrl) => {
+    await fetch(`${baseUrl}/v1/entities`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "books", definition: "type Book = { name: string; author: string }" })
+    });
+
+    const imported = await fetch(`${baseUrl}/v1/books`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify([{ name: "Dune", author: "Frank Herbert" }, { name: "Kindred", author: "Octavia Butler" }])
+    });
+    assert.equal(imported.status, 201);
+    const { items } = await imported.json();
+    assert.equal(items.length, 2);
+
+    const replaced = await fetch(`${baseUrl}/v1/books/${items[0].id}`, {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Dune Messiah", author: "Frank Herbert" })
+    });
+    assert.equal(replaced.status, 200);
+    assert.equal((await replaced.json()).name, "Dune Messiah");
+    assert.equal((await fetch(`${baseUrl}/books`)).status, 404);
   });
 });
