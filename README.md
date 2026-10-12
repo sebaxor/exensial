@@ -50,6 +50,8 @@ curl -X POST http://localhost:3000/v1/acme.work/tasks \
 
 Every recognized request and normalized response are also stored as the system entities `/v1/requests` and `/v1/responses`. A response reuses its request's `id`, so records correlate directly without a second relation field. Requests include `receivedAt`; responses include `completedAt` and `durationMs`, enabling timing and throughput analysis. API documentation is generated from the active entities at `/openapi.json`; Swagger UI is served at `/docs`.
 
+The dependency-free runtime console at `/console` reads that same OpenAPI document and generates a navigation menu plus list, create, edit, and delete screens for every active entity.
+
 The entity catalog is enabled by default. Run `EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start` to expose only application-installed modules and disable `/v1/entities`.
 
 Read [the entity authoring guide](docs/entities.md) for type syntax, localized JSDoc, namespaces, and business behavior. Read [the architecture](docs/architecture.md) for pipeline and design decisions.

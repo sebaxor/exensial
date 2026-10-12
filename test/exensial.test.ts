@@ -110,6 +110,9 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.deepEqual(collection.get.responses[200].content["application/json"].example, [{ id: "550e8400-e29b-41d4-a716-446655440000", name: "Example name" }]);
     assert.match(openapi.paths["/v1/documented-products/{id}"].patch.description, /Updates only the supplied fields/);
     assert.match(await (await fetch(`${baseUrl}/docs`)).text(), /SwaggerUIBundle/);
+    const consolePage = await (await fetch(`${baseUrl}/console`)).text();
+    assert.match(consolePage, /Runtime entity console/);
+    assert.match(consolePage, /openapi\.json/);
   });
 });
 

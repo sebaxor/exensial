@@ -5,6 +5,7 @@ import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/reques
 import type { DomainResponse } from "../domain/response";
 import { BadRequestError, parseJson, readBody, sendEmpty, sendJson } from "../http";
 import { createOpenApi } from "../openapi";
+import { consoleHtml } from "../ui/console";
 
 type HttpInput = { method: string; url: string; body?: string };
 export type RequestContext = {
@@ -55,6 +56,10 @@ export function documentationMiddleware(runtime: EntityRuntime): Middleware {
     }
     if (pathname === "/docs") {
       context.domainResponse = { status: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: swaggerHtml() };
+      return;
+    }
+    if (pathname === "/console") {
+      context.domainResponse = { status: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: consoleHtml() };
       return;
     }
     await next();
