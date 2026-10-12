@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 /** Persistence boundary for a runtime-defined entity. */
 export interface Repository<T extends { id: string }> {
-  create(data: Omit<T, "id">): T;
+  create(data: Omit<T, "id">, id?: string): T;
   findAll(): T[];
   findById(id: string): T | undefined;
   update(id: string, changes: Partial<Omit<T, "id">>): T | undefined;
@@ -12,8 +12,8 @@ export interface Repository<T extends { id: string }> {
 export class InMemoryRepository<T extends { id: string }> implements Repository<T> {
   private readonly items = new Map<string, T>();
 
-  create(data: Omit<T, "id">): T {
-    const item = { ...data, id: randomUUID() } as T;
+  create(data: Omit<T, "id">, id = randomUUID()): T {
+    const item = { ...data, id } as T;
     this.items.set(item.id, item);
     return item;
   }

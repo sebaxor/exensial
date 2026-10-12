@@ -78,13 +78,15 @@ test("persists normalized requests and responses as system entities", async () =
     const requests = await (await fetch(`${baseUrl}/v1/requests`)).json();
     const responses = await (await fetch(`${baseUrl}/v1/responses`)).json();
     const request = requests.find((item: { entityName: string }) => item.entityName === "authors");
-    const response = responses.find((item: { status: number }) => item.status === 201);
     assert.ok(request);
+    const response = responses.find((item: { id: string }) => item.id === request.id);
     assert.ok(response);
+    assert.equal(response.status, 201);
     assert.ok(Number.isFinite(Date.parse(request.receivedAt)));
     assert.ok(Number.isFinite(Date.parse(response.completedAt)));
     assert.equal(typeof response.durationMs, "number");
     assert.ok(response.durationMs >= 0);
+    assert.equal("requestId" in response, false);
   });
 });
 

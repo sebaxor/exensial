@@ -20,7 +20,6 @@ export const transportModules: EntityModule[] = [
     definition: {
       name: "responses",
       fields: {
-        requestId: { type: "string", required: false },
         status: { type: "number", required: true },
         completedAt: { type: "string", required: true },
         durationMs: { type: "number", required: true },

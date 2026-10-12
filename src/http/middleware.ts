@@ -118,7 +118,7 @@ export function requestRepositoryMiddleware(runtime: EntityRuntime): Middleware 
   };
 }
 
-/** Stores every matched request's normalized response in the `responses` repository. */
+/** Stores every matched response under the same id as its normalized request. */
 export function responseRepositoryMiddleware(runtime: EntityRuntime): Middleware {
   return async (context, next) => {
     try {
@@ -135,14 +135,13 @@ export function responseRepositoryMiddleware(runtime: EntityRuntime): Middleware
       payload: {
         kind: "one",
         value: {
-          ...(context.requestRecord?.id ? { requestId: context.requestRecord.id } : {}),
           status: response.status,
           completedAt: completedAt.toISOString(),
           durationMs: Math.max(0, completedAt.getTime() - (context.requestStartedAt ?? completedAt.getTime())),
           ...(response.body === undefined ? {} : { body: response.body })
         }
       }
-    });
+    }, context.requestRecord?.id ? { createId: context.requestRecord.id } : {});
   };
 }
 

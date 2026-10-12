@@ -35,7 +35,7 @@ The REST pattern middleware resolves a route against installed entities, capture
 
 The payload middleware converts a JSON object into `one` and a JSON list into `many`. A list is allowed only for collection `POST` and becomes `bulkCreate`. It resolves an item before parsing an update body so a missing id returns `404` consistently.
 
-Requests and responses are stored through ordinary system entities, `requests` and `responses`. Each request has an ISO 8601 `receivedAt` timestamp. Each response has `completedAt` and `durationMs`, measured from receipt by the HTTP adapter until the domain response is ready, before persisting the audit response itself. These fields support latency and throughput analysis through the same repository abstraction without sending audit writes back through HTTP.
+Requests and responses are stored through ordinary system entities, `requests` and `responses`. A request and its response share the same `id`: the response repository deliberately creates its record with the id generated for the request, so no `requestId` relation field is needed. Each request has an ISO 8601 `receivedAt` timestamp. Each response has `completedAt` and `durationMs`, measured from receipt by the HTTP adapter until the domain response is ready, before persisting the audit response itself. These fields support latency and throughput analysis through the same repository abstraction without sending audit writes back through HTTP.
 
 ## Runtime, entities, and repositories
 

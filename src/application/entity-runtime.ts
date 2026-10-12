@@ -72,12 +72,12 @@ export class EntityRuntime {
     this.requireRecord(entity, id);
   }
 
-  async execute(request: DomainRequest): Promise<EntityRecord | EntityRecord[] | undefined> {
+  async execute(request: DomainRequest, options: { createId?: string } = {}): Promise<EntityRecord | EntityRecord[] | undefined> {
     const entity = this.entities.get(entityKey(request.entityName, request.namespace));
     if (!entity) throw new EntityNotFoundError("Entity not found");
     const context: EntityOperationContext = { runtime: this, request, definition: entity.definition };
     this.prepareContext(entity, context);
-    await runOperationMiddleware(context, operationMiddleware(entity, request.action), () => this.executeDefault(entity, context));
+    await runOperationMiddleware(context, operationMiddleware(entity, request.action), () => this.executeDefault(entity, context, options));
     return context.result;
   }
 
@@ -92,19 +92,20 @@ export class EntityRuntime {
     if (request.action === "get" || request.action === "delete") context.current = this.requireRecord(entity, request.id);
   }
 
-  private async executeDefault(entity: ActiveEntity, context: EntityOperationContext): Promise<void> {
+  private async executeDefault(entity: ActiveEntity, context: EntityOperationContext, options: { createId?: string }): Promise<void> {
     const { action } = context.request;
     if (action === "list") context.result = entity.repository.findAll();
     if (action === "get") context.result = context.current;
-    if (action === "create") context.result = await this.create(entity, context.input as Record<string, unknown>);
+    if (action === "create") context.result = await this.create(entity, context.input as Record<string, unknown>, options.createId);
     if (action === "bulkCreate") context.result = await this.createMany(entity, context.input as Record<string, unknown>[]);
     if (action === "replace" || action === "update") context.result = await this.update(entity, context.current!, context.input as Record<string, unknown>);
     if (action === "delete") await this.delete(entity, context.current!);
   }
 
-  private async create(entity: ActiveEntity, data: Record<string, unknown>): Promise<EntityRecord> {
+  private async create(entity: ActiveEntity, data: Record<string, unknown>, id?: string): Promise<EntityRecord> {
     await entity.lifecycle?.beforeCreate?.(data);
-    const record = entity.repository.create(data as Omit<EntityRecord, "id">);
+    if (id && entity.repository.findById(id)) throw new EntityConflictError(`Record already exists: ${id}`);
+    const record = entity.repository.create(data as Omit<EntityRecord, "id">, id);
     await entity.lifecycle?.afterCreate?.(record);
     return record;
   }
