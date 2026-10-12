@@ -8,6 +8,12 @@ This lab installs a small library application entirely through Exensial's REST A
 
 The reusable runtime contains no knowledge of books or loans. Everything below is runtime data stored in the `entities` catalog.
 
+## Two executable forms
+
+The definitions below use Exensial's compact declarative `logic` vocabulary. They are the portable form of the lab and the curls in the appendices install them without application source code.
+
+The same domain can instead be supplied as a TypeScript `code` module in the entity request. The running local demonstration uses that form: its book and member modules normalize records (including bulk imports), while its loan module validates dates and active members, reserves a book copy, compensates a failed creation, releases a returned copy, and rejects deletion of an active loan. The module uses only `context.input`, `context.current`, `context.records`, `context.fail`, and `next`; it has no HTTP or repository dependency. See [runtime TypeScript domain modules](../runtime-code.md) for the complete executable contract and a loan module example.
+
 ## Domain definitions
 
 ### Books
