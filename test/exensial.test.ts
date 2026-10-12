@@ -182,6 +182,7 @@ test("installs a TypeScript domain module received through the entity endpoint",
           const book = context.records.get("books", String(input.bookId), "coded-library");
           if (!book || Number(book.copiesAvailable) < 1) context.fail("Book is not available");
           await context.records.update("books", String(input.bookId), { copiesAvailable: Number(book.copiesAvailable) - 1 }, "coded-library");
+          delete input.returnedAt;
           input.status = "active";
           await next();
         },
@@ -195,14 +196,15 @@ test("installs a TypeScript domain module received through the entity endpoint",
     `;
     const definition = await post("/v1/entities", {
       name: "loans", namespace: "coded-library",
-      definition: "type Loan = { bookId: string; memberId: string; status?: string }",
+      definition: "type Loan = { bookId: string; memberId: string; returnedAt?: string; status?: string }",
       code
     });
     assert.equal(definition.status, 201);
-    const loanResponse = await post("/v1/coded-library/loans", { bookId: book.id, memberId: " ANA " });
+    const loanResponse = await post("/v1/coded-library/loans", { bookId: book.id, memberId: " ANA ", returnedAt: "2026-10-12T10:00:00.000Z" });
     const loan = await loanResponse.json();
     assert.equal(loanResponse.status, 201);
     assert.deepEqual({ memberId: loan.memberId, status: loan.status }, { memberId: "ana", status: "active" });
+    assert.equal("returnedAt" in loan, false);
     assert.equal((await (await fetch(`${baseUrl}/v1/coded-library/books/${book.id}`)).json()).copiesAvailable, 0);
     assert.equal((await post("/v1/coded-library/loans", { bookId: book.id, memberId: "mateo" })).status, 400);
     assert.equal((await fetch(`${baseUrl}/v1/coded-library/loans/${loan.id}`, {

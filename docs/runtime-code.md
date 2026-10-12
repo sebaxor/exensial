@@ -44,6 +44,8 @@ type BusinessContext = {
 
 `input` is mutable before `next()`, allowing normalization and derived fields. `current` is the persisted record for item operations. `collection("books", "library")` is the readable shorthand for working with one related collection; `records` is the equivalent lower-level form. Neither reveals persistence implementation. This is the seam that will later map to a table repository, a transaction, an event stream, or another persistence mechanism.
 
+Because `input` is mutable, a domain module may also enforce ownership of workflow fields. For example, a loan's `create` operation can use `delete loan.returnedAt` and set `loan.status = "active"`; only its return transition may later set `returnedAt` during `update`.
+
 ## Example: copy-aware loans
 
 This module is domain code, not an HTTP handler. It reserves a copy before generic loan creation and releases it after a successful return.

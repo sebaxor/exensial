@@ -31,6 +31,7 @@ export default {
     if (!isDate(loan.borrowedAt) || !isDate(loan.dueAt) || Date.parse(loan.dueAt) <= Date.parse(loan.borrowedAt)) context.fail("A later valid dueAt is required");
 
     await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) - 1 });
+    delete loan.returnedAt;
     try { loan.status = "active"; await next(); }
     catch (error) { await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) }); throw error; }
   },
@@ -52,7 +53,7 @@ export default {
 
 - A new book begins with all copies available.
 - A loan requires an active member, an available book, and a valid future due date.
-- Creating a loan reserves one copy; a failed create restores it.
+- Creating a loan reserves one copy, always starts it as `active`, and discards a caller-supplied `returnedAt`; a failed create restores the copy.
 - Returning an active loan releases one copy; active loans cannot be deleted.
 
 ## Appendix: curls
