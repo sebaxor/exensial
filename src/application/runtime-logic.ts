@@ -17,20 +17,46 @@ export function compileRuntimeLogic(value: unknown): Partial<Record<CrudAction, 
   for (const [action, definition] of Object.entries(value)) {
     if (!actions.includes(action as CrudAction)) throw new ValidationError(`Unsupported logic operation: ${action}`);
     const operation = operationDefinition(definition, action);
-    compiled[action as CrudAction] = async (context, next) => {
-      const state: RuleState = { lookups: new Map(), compensations: [] };
-      await runRules(operation.before, context, state);
-      try {
-        await next();
-      } catch (error) {
-        await runRules(operation.onError, context, state);
-        for (const compensate of state.compensations.reverse()) await compensate();
-        throw error;
-      }
-      await runRules(operation.after, context, state);
-    };
+    compiled[action as CrudAction] = operationMiddleware(operation);
+  }
+  if (value.create !== undefined && value.bulkCreate === undefined) {
+    compiled.bulkCreate = bulkCreateMiddleware(operationDefinition(value.create, "create"));
   }
   return compiled;
+}
+
+function operationMiddleware(operation: Required<OperationDefinition>): EntityOperationMiddleware {
+  return async (context, next) => {
+    const state: RuleState = { lookups: new Map(), compensations: [] };
+    await runRules(operation.before, context, state);
+    try {
+      await next();
+    } catch (error) {
+      await compensate(operation, context, state);
+      throw error;
+    }
+    await runRules(operation.after, context, state);
+  };
+}
+
+function bulkCreateMiddleware(operation: Required<OperationDefinition>): EntityOperationMiddleware {
+  return async (context, next) => {
+    if (!Array.isArray(context.input)) throw new ValidationError("Bulk logic requires an array input");
+    const prepared = context.input.map((input) => ({ context: { ...context, input }, state: { lookups: new Map(), compensations: [] } }));
+    for (const item of prepared) await runRules(operation.before, item.context, item.state);
+    try {
+      await next();
+    } catch (error) {
+      for (const item of prepared.reverse()) await compensate(operation, item.context, item.state);
+      throw error;
+    }
+    for (const item of prepared) await runRules(operation.after, item.context, item.state);
+  };
+}
+
+async function compensate(operation: Required<OperationDefinition>, context: EntityOperationContext, state: RuleState): Promise<void> {
+  await runRules(operation.onError, context, state);
+  for (const compensate of state.compensations.reverse()) await compensate();
 }
 
 function operationDefinition(value: unknown, action: string): Required<OperationDefinition> {

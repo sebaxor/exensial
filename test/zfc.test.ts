@@ -194,6 +194,12 @@ test("installs availability reservation rules through runtime logic", async () =
     const book = await (await post("/v1/library/books", { title: "  A Wizard of Earthsea  ", copiesTotal: 1 })).json();
     assert.equal(book.title, "A Wizard of Earthsea");
     assert.equal(book.copiesAvailable, 1);
+    const imported = await post("/v1/library/books", [{ title: "  Tehanu  ", copiesTotal: 2 }]);
+    assert.equal(imported.status, 201);
+    const importedBook = (await imported.json()).items[0];
+    assert.equal(importedBook.title, "Tehanu");
+    assert.equal(importedBook.copiesAvailable, 2);
+    assert.ok(importedBook.id);
     const loanDefinition = await post("/v1/entities", {
       name: "loans",
       namespace: "library",
