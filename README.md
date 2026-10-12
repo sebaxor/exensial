@@ -1,8 +1,8 @@
-# ZFC
+# Exensial
 
-API mínima para definir conjuntos dinámicos y operar sus elementos mediante REST.
+Exensial is a minimal TypeScript runtime for defining data collections and exposing standard REST CRUD at runtime.
 
-El código fuente se ejecuta directamente con `tsx`; los imports internos no llevan extensión.
+The source runs directly through `tsx`; internal imports intentionally omit file extensions.
 
 ```bash
 npm install
@@ -10,7 +10,7 @@ npm test
 npm start
 ```
 
-Define un conjunto enviando un alias de tipo TypeScript (por ahora admite campos `string`, `number`, `boolean` y `json`):
+Create an entity by sending a constrained TypeScript type alias. Supported field types are `string`, `number`, `boolean`, and `json`.
 
 ```bash
 curl -X POST http://localhost:3000/v1/entities \
@@ -18,31 +18,36 @@ curl -X POST http://localhost:3000/v1/entities \
   -d '{"name":"tasks","definition":"type Task = { title: string; completed?: boolean }"}'
 ```
 
-Después, el nombre se convierte en el recurso REST:
+An entity with no namespace is available at `/v1/tasks`:
 
 ```bash
-# Crear
-curl -X POST http://localhost:3000/v1/tasks -H 'content-type: application/json' -d '{"title":"Draft the report"}'
-
-# Listar / leer uno
+curl -X POST http://localhost:3000/v1/tasks \
+  -H 'content-type: application/json' \
+  -d '{"title":"Draft the report"}'
 curl http://localhost:3000/v1/tasks
 curl http://localhost:3000/v1/tasks/:id
-
-# Actualizar / borrar
-curl -X PATCH http://localhost:3000/v1/tasks/:id -H 'content-type: application/json' -d '{"completed":true}'
+curl -X PATCH http://localhost:3000/v1/tasks/:id \
+  -H 'content-type: application/json' \
+  -d '{"completed":true}'
 curl -X DELETE http://localhost:3000/v1/tasks/:id
 ```
 
-`entities` es también una entidad del sistema: su repositorio conserva las definiciones y sus hooks de ciclo de vida despliegan, actualizan o retiran las entidades dinámicas. Los datos son intencionalmente en memoria para este primer corte: al reiniciar el proceso se vacían.
+`namespace` is optional. When supplied, it is part of the route after the API version:
 
-También se pueden instalar entidades escritas como módulos TypeScript al crear la app. Un módulo puede declarar `definition` y hooks de ciclo de vida; después recibe el mismo CRUD REST genérico.
+```bash
+curl -X POST http://localhost:3000/v1/entities \
+  -H 'content-type: application/json' \
+  -d '{"name":"tasks","namespace":"acme.work","definition":"type Task = { title: string }"}'
 
-Cada request REST reconocido y cada resultado se conservan, respectivamente, como entidades de sistema consultables en `/v1/requests` y `/v1/responses`.
+curl -X POST http://localhost:3000/v1/acme.work/tasks \
+  -H 'content-type: application/json' \
+  -d '{"title":"Review the proposal"}'
+```
 
-La especificación dinámica está en `/openapi.json` y la interfaz Swagger está en `/docs`.
+`entities` is a system entity. Its repository stores the definitions, while its lifecycle installs, updates, or removes the matching runtime entity. Data is intentionally in memory, so a restart clears it.
 
-El catálogo de entidades puede desactivarse al iniciar: `EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start`. En ese modo, `/v1/entities` no está disponible y solo quedan los módulos instalados explícitamente por la aplicación.
+Every recognized request and normalized response are also stored as the system entities `/v1/requests` and `/v1/responses`. API documentation is generated from the active entities at `/openapi.json`; Swagger UI is served at `/docs`.
 
-La guía práctica para definir tipos, localización, namespaces y lógica de negocio está en [docs/entities.md](docs/entities.md).
+The entity catalog is enabled by default. Run `EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start` to expose only application-installed modules and disable `/v1/entities`.
 
-Consulta [la arquitectura y las decisiones técnicas](docs/architecture.md) para el diseño completo.
+Read [the entity authoring guide](docs/entities.md) for type syntax, localized JSDoc, namespaces, and business behavior. Read [the architecture](docs/architecture.md) for pipeline and design decisions.

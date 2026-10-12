@@ -1,8 +1,8 @@
-# Crear entidades en Exensial
+# Authoring entities in Exensial
 
-## Entidad solo con estructura
+## Schema-only entity
 
-Envía un alias TypeScript a `POST /v1/entities`. El nombre se convierte en la ruta:
+Send a TypeScript type alias to `POST /v1/entities`. The `name` becomes the REST resource name.
 
 ```json
 {
@@ -11,81 +11,105 @@ Envía un alias TypeScript a `POST /v1/entities`. El nombre se convierte en la r
 }
 ```
 
-Esto crea inmediatamente `POST/GET /v1/tasks` y `GET/PUT/PATCH/DELETE /v1/tasks/:id`.
+This immediately creates `POST/GET /v1/tasks` and `GET/PUT/PATCH/DELETE /v1/tasks/:id`. Supported field types are `string`, `number`, `boolean`, and `json`; `?` marks an optional field.
 
-Tipos admitidos: `string`, `number`, `boolean`, `json` y campos opcionales con `?`.
+## Namespaces and routes
 
-## Nombres, descripciones e idiomas
+`namespace` is optional. It is a package-style identifier such as `acme.work` and becomes the route segment immediately after the API version.
 
-Usa JSDoc dentro de la definición. Los tags son `@zfc.title` y `@zfc.description`, seguidos por locale y texto.
+```json
+{
+  "name": "tasks",
+  "namespace": "acme.work",
+  "definition": "type Task = { title: string }"
+}
+```
+
+The resulting routes are `GET/POST /v1/acme.work/tasks` and `GET/PUT/PATCH/DELETE /v1/acme.work/tasks/:id`. Without a namespace, the routes remain `/v1/tasks`. The pair `(namespace, name)` is the entity identity, so separate namespaces may use the same name.
+
+## Localized documentation
+
+Use JSDoc inside the definition. `@exensial.title` and `@exensial.description` take a locale followed by text. Place them before the type alias or a field.
 
 ```ts
 /**
- * @zfc.title en Tasks
- * @zfc.title es Tareas
- * @zfc.description en Work items for a team
+ * @exensial.title en Tasks
+ * @exensial.title es Tareas
+ * @exensial.description en Work items for a team
  */
 type Task = {
   /**
-   * @zfc.title en Title
-   * @zfc.title es Título
-   * @zfc.description en A concise task summary
+   * @exensial.title en Title
+   * @exensial.title es Título
+   * @exensial.description en A concise task summary
    */
   title: string;
   completed?: boolean;
 }
 ```
 
-La información aparece en `/openapi.json`: el título/descripción inglés se usa en campos estándar OpenAPI y todos los idiomas se conservan en `x-zfc-localized`.
+OpenAPI uses the English text, when present, in standard `title` and `description` properties. It preserves every locale in `x-exensial-localized`, so a UI can select its own language without parsing the source again.
 
-## Contexto lógico
+## Business behavior
 
-`namespace` no cambia la ruta, pero organiza la entidad para clientes y reglas futuras. Usa nombres tipo package con puntos:
+The HTTP definition body never contains executable code. Application code registers trusted behavior modules at startup; an entity can select one by its stable `module` id.
 
-```json
-{ "name": "tasks", "namespace": "acme.work", "definition": "..." }
-```
-
-Se publica como `x-exensial-context` en OpenAPI.
-
-## Comportamiento de negocio
-
-El body HTTP nunca contiene código ejecutable. La aplicación registra módulos confiables y una entidad puede seleccionarlos con `module`:
+This example normalizes a book title before the default create behavior, rejects a second active loan for the same member and book, and decorates the resulting record after it is saved:
 
 ```ts
-const normalizeTitle: EntityBehaviorModule = {
-  id: "acme/normalize-title",
+import { createApp } from "./app";
+import type { EntityBehaviorModule } from "./application/entity-behaviors";
+
+const libraryLoans: EntityBehaviorModule = {
+  id: "library/loans",
   operations: {
     create: async (context, next) => {
       const input = context.input as Record<string, unknown>;
-      input.title = String(input.title).trim();
-      await next();
-    }
+      input.bookTitle = String(input.bookTitle).trim();
+
+      const existing = await context.runtime.execute({
+        apiVersion: context.request.apiVersion,
+        namespace: context.request.namespace,
+        entityName: context.definition.name,
+        action: "list"
+      }) as Array<Record<string, unknown>>;
+      if (existing.some((loan) => loan.memberId === input.memberId && loan.bookTitle === input.bookTitle && !loan.returnedAt)) {
+        throw new Error("This member already has this book on loan");
+      }
+
+      await next(); // runs validation-complete generic repository CRUD
+      context.result = { ...(context.result as Record<string, unknown>), status: "active" }; // response decoration
+    },
+    delete: async (_context, next) => { await next(); }
   }
 };
 
-createApp({ behaviorModules: [normalizeTitle] });
+createApp({ behaviorModules: [libraryLoans] });
 ```
 
-Después se declara desde runtime:
+Register an entity that uses the module through the entity catalog:
 
 ```json
 {
-  "name": "tasks",
-  "namespace": "acme.work",
-  "module": "acme/normalize-title",
-  "definition": "type Task = { title: string }"
+  "name": "loans",
+  "namespace": "library",
+  "module": "library/loans",
+  "definition": "type Loan = { memberId: string; bookTitle: string; returnedAt?: string }"
 }
 ```
 
-Las operaciones posibles son `create`, `bulkCreate`, `list`, `get`, `replace`, `update` y `delete`. El `context` expone input validado, registro actual, resultado, request normalizado y runtime. `await next()` ejecuta el CRUD genérico; omitirlo permite reemplazarlo mediante `context.result`.
+The module runs for `POST /v1/library/loans`. Available operations are `create`, `bulkCreate`, `list`, `get`, `replace`, `update`, and `delete`.
 
-## Activar el catálogo
+The middleware context contains `request` (the normalized request), `definition` (schema and context), `input` (validated create/replace/update data), `current` (loaded item data), `result` (the CRUD result), and `runtime` (the same domain runtime used by every entity).
 
-El catálogo de entidades está activo por defecto. Para ejecutar solo módulos instalados por código:
+`await next()` invokes the next operation middleware and eventually generic CRUD. Call it once to extend the default behavior before and/or after it. Omitting it replaces default CRUD; set `context.result` when the operation needs to return data. Errors thrown by a behavior are normalized by the HTTP adapter. Because only server-registered module ids are accepted, no code received over HTTP is imported or executed.
+
+## Disabling the catalog
+
+The entity catalog is enabled by default. To run only modules installed in application code:
 
 ```bash
 EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start
 ```
 
-En ese modo, `/v1/entities` devuelve `404`.
+In that mode, `/v1/entities` returns `404`.

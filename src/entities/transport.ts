@@ -7,6 +7,7 @@ export const transportModules: EntityModule[] = [
       name: "requests",
       fields: {
         apiVersion: { type: "string", required: true },
+        namespace: { type: "string", required: false },
         entityName: { type: "string", required: true },
         action: { type: "string", required: true },
         id: { type: "string", required: false },

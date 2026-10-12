@@ -35,42 +35,45 @@ export class EntityRuntime {
   private readonly entities = new Map<string, ActiveEntity>();
 
   install(module: EntityModule): void {
-    if (this.entities.has(module.definition.name)) throw new EntityConflictError(`Entity already exists: ${module.definition.name}`);
-    this.entities.set(module.definition.name, { ...module, repository: new InMemoryRepository<EntityRecord>() });
+    const key = entityKey(module.definition.name, module.definition.context?.namespace);
+    if (this.entities.has(key)) throw new EntityConflictError(`Entity already exists: ${key}`);
+    this.entities.set(key, { ...module, repository: new InMemoryRepository<EntityRecord>() });
   }
 
   installIfMissing(module: EntityModule): boolean {
-    if (this.entities.has(module.definition.name)) return false;
+    if (this.has(module.definition.name, module.definition.context?.namespace)) return false;
     this.install(module);
     return true;
   }
 
-  replace(name: string, module: EntityModule): void {
-    const current = this.entities.get(name);
+  replace(name: string, module: EntityModule, namespace?: string): void {
+    const oldKey = entityKey(name, namespace);
+    const newKey = entityKey(module.definition.name, module.definition.context?.namespace);
+    const current = this.entities.get(oldKey);
     if (!current) throw new EntityNotFoundError();
-    if (name !== module.definition.name && this.entities.has(module.definition.name)) throw new EntityConflictError(`Entity already exists: ${module.definition.name}`);
-    this.entities.delete(name);
-    this.entities.set(module.definition.name, { ...module, repository: current.repository });
+    if (oldKey !== newKey && this.entities.has(newKey)) throw new EntityConflictError(`Entity already exists: ${newKey}`);
+    this.entities.delete(oldKey);
+    this.entities.set(newKey, { ...module, repository: current.repository });
   }
 
-  remove(name: string): void {
-    if (!this.entities.delete(name)) throw new EntityNotFoundError();
+  remove(name: string, namespace?: string): void {
+    if (!this.entities.delete(entityKey(name, namespace))) throw new EntityNotFoundError();
   }
 
-  has(name: string): boolean { return this.entities.has(name); }
+  has(name: string, namespace?: string): boolean { return this.entities.has(entityKey(name, namespace)); }
 
   definitions(): EntityDefinition[] {
     return [...this.entities.values()].map(({ definition }) => definition);
   }
 
-  assertRecord(entityName: string, id?: string): void {
-    const entity = this.entities.get(entityName);
+  assertRecord(entityName: string, id?: string, namespace?: string): void {
+    const entity = this.entities.get(entityKey(entityName, namespace));
     if (!entity) throw new EntityNotFoundError("Entity not found");
     this.requireRecord(entity, id);
   }
 
   async execute(request: DomainRequest): Promise<EntityRecord | EntityRecord[] | undefined> {
-    const entity = this.entities.get(request.entityName);
+    const entity = this.entities.get(entityKey(request.entityName, request.namespace));
     if (!entity) throw new EntityNotFoundError("Entity not found");
     const context: EntityOperationContext = { runtime: this, request, definition: entity.definition };
     this.prepareContext(entity, context);
@@ -149,6 +152,10 @@ export class EntityRuntime {
     if (!payload.values.length) throw new ValidationError("Bulk creation requires at least one record");
     return payload.values;
   }
+}
+
+function entityKey(name: string, namespace?: string): string {
+  return namespace ? `${namespace}/${name}` : name;
 }
 
 function operationMiddleware(entity: ActiveEntity, action: DomainRequest["action"]): EntityOperationMiddleware[] {

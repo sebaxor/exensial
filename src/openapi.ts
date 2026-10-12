@@ -4,7 +4,7 @@ type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
 export function createOpenApi(definitions: EntityDefinition[]): Record<string, unknown> {
-  const schemas = Object.fromEntries(definitions.map((definition) => [definition.name, entitySchema(definition)]));
+  const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition)]));
   const paths = Object.assign({}, ...definitions.map((definition) => entityPaths(definition)));
   return {
     openapi: "3.0.4",
@@ -27,7 +27,7 @@ function entitySchema(definition: EntityDefinition): Schema {
     type: "object",
     title: text(definition.documentation?.title) ?? definition.name,
     description: text(definition.documentation?.description),
-    "x-zfc-localized": definition.documentation,
+    "x-exensial-localized": definition.documentation,
     "x-exensial-context": definition.context,
     properties,
     required: ["id", ...Object.entries(definition.fields).filter(([, field]) => field.required).map(([name]) => name)]
@@ -39,7 +39,7 @@ function fieldSchema(field: FieldDefinition): Schema {
     ...scalarSchema(field.type),
     title: text(field.documentation?.title),
     description: text(field.documentation?.description),
-    "x-zfc-localized": field.documentation
+    "x-exensial-localized": field.documentation
   };
 }
 
@@ -49,8 +49,9 @@ function scalarSchema(type: ScalarType): Schema {
 }
 
 function entityPaths(definition: EntityDefinition): Record<string, unknown> {
-  const reference = { $ref: `#/components/schemas/${definition.name}` };
-  const collectionPath = `/v1/${definition.name}`;
+  const reference = { $ref: `#/components/schemas/${schemaKey(definition)}` };
+  const namespace = definition.context?.namespace;
+  const collectionPath = `/v1/${namespace ? `${namespace}/` : ""}${definition.name}`;
   const itemPath = `${collectionPath}/{id}`;
   return {
     [collectionPath]: {
@@ -82,11 +83,12 @@ function operation(summary: string, definition: EntityDefinition, responses: Rec
 function jsonContent(schema: Schema): Schema { return { "application/json": { schema } }; }
 function errorResponse(): Schema { return { description: "Not found", content: jsonContent({ type: "object", properties: { error: { type: "string" } }, required: ["error"] }) }; }
 function text(localized?: LocalizedText): string | undefined { return localized?.en ?? Object.values(localized ?? {})[0]; }
+function schemaKey(definition: EntityDefinition): string { return definition.context?.namespace ? `${definition.context.namespace}.${definition.name}` : definition.name; }
 
 function entityCatalogGuide(): string {
-  return `## Entidades dinámicas
+  return `## Dynamic entities
 
-Usa **POST /v1/entities** para convertir un alias TypeScript en un recurso REST. Por ejemplo:
+Use **POST /v1/entities** to turn a TypeScript type alias into a REST resource. For example:
 
 \`\`\`json
 {
@@ -96,13 +98,13 @@ Usa **POST /v1/entities** para convertir un alias TypeScript en un recurso REST.
 }
 \`\`\`
 
-El resultado expone automáticamente \`GET/POST /v1/tasks\` y \`GET/PUT/PATCH/DELETE /v1/tasks/{id}\`.
+This publishes \`GET/POST /v1/acme.work/tasks\` and \`GET/PUT/PATCH/DELETE /v1/acme.work/tasks/{id}\`. Omit \`namespace\` to publish \`/v1/tasks\` instead.
 
-### Documentación y localización
+### Documentation and localization
 
-Incluye JSDoc con \`@zfc.title <locale> <texto>\` y \`@zfc.description <locale> <texto>\` antes del tipo o de cada campo. Swagger muestra el idioma principal y conserva todos los idiomas en \`x-zfc-localized\`.
+Add JSDoc with \`@exensial.title <locale> <text>\` and \`@exensial.description <locale> <text>\` before the type or a field. Swagger uses English when available and preserves all locales in \`x-exensial-localized\`.
 
-### Lógica de negocio
+### Business logic
 
-\`module\` solo acepta ids de módulos confiables registrados por el servidor. Esos módulos pueden interceptar \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\` y \`delete\`. Con \`await next()\` complementan el CRUD base; sin \`next()\`, lo reemplazan asignando \`context.result\`. Nunca se ejecuta código enviado por HTTP.`;
+\`module\` accepts only trusted module ids registered by the server. Modules can intercept \`create\`, \`bulkCreate\`, \`list\`, \`get\`, \`replace\`, \`update\`, and \`delete\`. Use \`await next()\` to extend base CRUD; omit it and assign \`context.result\` to replace it. HTTP never executes submitted code.`;
 }

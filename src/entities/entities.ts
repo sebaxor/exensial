@@ -6,17 +6,16 @@ import type { EntityBehaviorRegistry } from "../application/entity-behaviors";
 const definition = {
   name: "entities",
   documentation: {
-    title: { en: "Entity catalog", es: "Catálogo de entidades" },
+    title: { en: "Entity catalog" },
     description: {
-      en: "Creates, updates, and removes runtime REST entities from TypeScript type aliases.",
-      es: "Crea, actualiza y elimina entidades REST en runtime a partir de alias de tipo TypeScript."
+      en: "Creates, updates, and removes runtime REST entities from TypeScript type aliases."
     }
   },
   fields: {
-    name: { type: "string", required: true, documentation: { title: { en: "Route name", es: "Nombre de ruta" } } },
-    definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type", es: "Tipo TypeScript" } } },
-    namespace: { type: "string", required: false, documentation: { title: { en: "Logical namespace", es: "Namespace lógico" } } },
-    module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module", es: "Módulo de comportamiento confiable" } } }
+    name: { type: "string", required: true, documentation: { title: { en: "Route name" } } },
+    definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type" } } },
+    namespace: { type: "string", required: false, documentation: { title: { en: "Namespace" } } },
+    module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" } } }
   }
 } satisfies EntityModule["definition"];
 
@@ -45,16 +44,21 @@ export function createEntitiesModule(runtime: EntityRuntime, behaviors: EntityBe
     definition,
     lifecycle: {
       beforeCreate(input) {
-        if (runtime.has(input.name as string)) throw new EntityConflictError("Entity already exists");
+        if (runtime.has(input.name as string, input.namespace as string | undefined)) throw new EntityConflictError("Entity already exists");
         dynamicModule(input as EntityDefinitionRecord, behaviors);
       },
       afterCreate(record) { runtime.install(dynamicModule(record as EntityDefinitionRecord, behaviors)); },
       beforeUpdate(current, next) {
         if (current.name !== next.name) throw new ValidationError("Entity name cannot be changed");
+        if (current.namespace !== next.namespace && runtime.has(next.name as string, next.namespace as string | undefined)) {
+          throw new EntityConflictError("Entity already exists");
+        }
         dynamicModule(next as EntityDefinitionRecord, behaviors);
       },
-      afterUpdate(_previous, record) { runtime.replace(record.name as string, dynamicModule(record as EntityDefinitionRecord, behaviors)); },
-      afterDelete(record) { runtime.remove(record.name as string); }
+      afterUpdate(previous, record) {
+        runtime.replace(previous.name as string, dynamicModule(record as EntityDefinitionRecord, behaviors), previous.namespace as string | undefined);
+      },
+      afterDelete(record) { runtime.remove(record.name as string, record.namespace as string | undefined); }
     }
   };
 }

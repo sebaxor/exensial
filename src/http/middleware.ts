@@ -59,13 +59,12 @@ export function documentationMiddleware(runtime: EntityRuntime): Middleware {
   };
 }
 
-/** Captures the `/vN/:entity/:id?` route as a transport-neutral DomainRequest. */
+/** Captures `/vN/:entity/:id?` or `/vN/:namespace/:entity/:id?` as a transport-neutral DomainRequest. */
 export function restPatternMiddleware(runtime: EntityRuntime): Middleware {
   return async (context, next) => {
     const input = requireHttpInput(context);
-    const route = matchRoute(input.url);
+    const route = matchRoute(input.url, runtime);
     if (!route) throw new EntityNotFoundError("Route not found");
-    if (!runtime.has(route.entityName)) throw new EntityNotFoundError("Entity not found");
     const action = actionFor(input.method, route.id);
     if (!action) throw new MethodNotAllowedError();
     context.domainRequest = { ...route, action };
@@ -79,7 +78,7 @@ export function payloadPatternMiddleware(runtime: EntityRuntime): Middleware {
     const domainRequest = context.domainRequest;
     if (!domainRequest || !requiresBody(domainRequest.action)) return next();
     if (domainRequest.action === "update" || domainRequest.action === "replace") {
-      runtime.assertRecord(domainRequest.entityName, domainRequest.id);
+      runtime.assertRecord(domainRequest.entityName, domainRequest.id, domainRequest.namespace);
     }
     const rawBody = requireHttpInput(context).body;
     const payload = capturePayload(rawBody === undefined ? undefined : parseJson(rawBody));
@@ -103,6 +102,7 @@ export function requestRepositoryMiddleware(runtime: EntityRuntime): Middleware 
         kind: "one",
         value: {
           apiVersion: request.apiVersion,
+          ...(request.namespace ? { namespace: request.namespace } : {}),
           entityName: request.entityName,
           action: request.action,
           ...(request.id ? { id: request.id } : {}),
@@ -180,11 +180,20 @@ function writeHttpResponse(response: ServerResponse, domain: DomainResponse): vo
   sendJson(response, domain.status, domain.body);
 }
 
-function matchRoute(url: string): Pick<DomainRequest, "apiVersion" | "entityName" | "id"> | undefined {
+function matchRoute(url: string, runtime: EntityRuntime): Pick<DomainRequest, "apiVersion" | "namespace" | "entityName" | "id"> | undefined {
   const pathname = new URL(url, "http://localhost").pathname;
-  const match = pathname.match(/^\/(v\d+)\/([^/]+)(?:\/([^/]+))?\/?$/);
-  if (!match) return undefined;
-  return { apiVersion: match[1], entityName: decodeURIComponent(match[2]), id: match[3] ? decodeURIComponent(match[3]) : undefined };
+  const segments = pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  const [apiVersion, ...parts] = segments;
+  if (!apiVersion || !/^v\d+$/.test(apiVersion)) return undefined;
+  if (parts.length === 1 && runtime.has(parts[0])) return { apiVersion, entityName: parts[0] };
+  if (parts.length === 2) {
+    if (runtime.has(parts[0])) return { apiVersion, entityName: parts[0], id: parts[1] };
+    if (runtime.has(parts[1], parts[0])) return { apiVersion, namespace: parts[0], entityName: parts[1] };
+  }
+  if (parts.length === 3 && runtime.has(parts[1], parts[0])) {
+    return { apiVersion, namespace: parts[0], entityName: parts[1], id: parts[2] };
+  }
+  return undefined;
 }
 
 function actionFor(method: string, id?: string): CrudAction | undefined {

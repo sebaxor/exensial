@@ -82,17 +82,17 @@ test("persists normalized requests and responses as system entities", async () =
   });
 });
 
-test("generates localized OpenAPI documentation from JSDoc entity metadata", async () => {
+test("generates localized OpenAPI documentation from Exensial JSDoc metadata", async () => {
   await withApi(async (baseUrl) => {
-    const definition = `/**\n * @zfc.title en Products\n * @zfc.title es Productos\n * @zfc.description en A product catalog\n */\ntype Product = {\n  /** @zfc.title en Title */\n  name: string;\n}`;
+    const definition = `/**\n * @exensial.title en Products\n * @exensial.title es Productos\n * @exensial.description en A product catalog\n */\ntype Product = {\n  /** @exensial.title en Title */\n  name: string;\n}`;
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "documented-products", definition }) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.info.title, "Exensial API");
-    assert.match(openapi.info.description, /Entidades dinámicas/);
+    assert.match(openapi.info.description, /Dynamic entities/);
     assert.equal(openapi.components.schemas.entities.title, "Entity catalog");
     const schema = openapi.components.schemas["documented-products"];
     assert.equal(schema.title, "Products");
-    assert.equal(schema["x-zfc-localized"].title.es, "Productos");
+    assert.equal(schema["x-exensial-localized"].title.es, "Productos");
     assert.ok(openapi.paths["/v1/documented-products"]);
     assert.match(await (await fetch(`${baseUrl}/docs`)).text(), /SwaggerUIBundle/);
   });
@@ -123,17 +123,41 @@ test("binds trusted operation middleware to a runtime-defined entity", async () 
       })
     });
     assert.equal(entity.status, 201);
-    const created = await fetch(`${baseUrl}/v1/announcements`, {
+    const created = await fetch(`${baseUrl}/v1/demo.content/announcements`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "  hello  " })
     });
     assert.equal((await created.json()).title, "HELLO");
-    assert.deepEqual(await (await fetch(`${baseUrl}/v1/announcements`)).json(), []);
+    assert.deepEqual(await (await fetch(`${baseUrl}/v1/demo.content/announcements`)).json(), []);
+    assert.equal((await fetch(`${baseUrl}/v1/announcements`)).status, 404);
+    const requests = await (await fetch(`${baseUrl}/v1/requests`)).json();
+    assert.ok(requests.some((request: { namespace?: string; entityName: string }) => request.namespace === "demo.content" && request.entityName === "announcements"));
 
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
-    assert.deepEqual(openapi.components.schemas.announcements["x-exensial-context"], {
+    assert.deepEqual(openapi.components.schemas["demo.content.announcements"]["x-exensial-context"], {
       namespace: "demo.content", module: "example/normalize-title", operations: ["create", "list"]
     });
+    assert.ok(openapi.paths["/v1/demo.content/announcements"]);
   }, { behaviorModules: [normalizeTitle] });
+});
+
+test("allows equal entity names in separate namespaces", async () => {
+  await withApi(async (baseUrl) => {
+    for (const namespace of ["acme.sales", "acme.support"]) {
+      const response = await fetch(`${baseUrl}/v1/entities`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "tickets", namespace, definition: "type Ticket = { subject: string }" })
+      });
+      assert.equal(response.status, 201);
+    }
+    assert.equal((await fetch(`${baseUrl}/v1/acme.sales/tickets`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ subject: "Invoice" })
+    })).status, 201);
+    assert.equal((await fetch(`${baseUrl}/v1/acme.support/tickets`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ subject: "Login" })
+    })).status, 201);
+    assert.equal((await (await fetch(`${baseUrl}/v1/acme.sales/tickets`)).json()).length, 1);
+    assert.equal((await (await fetch(`${baseUrl}/v1/acme.support/tickets`)).json()).length, 1);
+  });
 });
 
 test("can disable the entity catalog layer", async () => {

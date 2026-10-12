@@ -1,6 +1,6 @@
 import type { Documentation, FieldDefinition, ScalarType } from "./entity";
 
-/** Parses the deliberately small TypeScript type-alias subset supported by ZFC. */
+/** Parses the deliberately small TypeScript type-alias subset supported by Exensial. */
 export function parseEntitySource(source: string): { typeName: string; fields: Record<string, FieldDefinition>; documentation?: Documentation } {
   const match = source.match(/^\s*(?:\/\*\*([\s\S]*?)\*\/\s*)?type\s+(\w+)\s*=\s*\{([\s\S]*)\}\s*;?\s*$/);
   if (!match) throw new ValidationError("Expected a TypeScript type alias, e.g. type Task = { title: string }");
@@ -53,12 +53,12 @@ function hasExpectedType(value: unknown, type: ScalarType): boolean {
   return typeof value === type;
 }
 
-/** Extracts localized JSDoc tags: `@zfc.title es Título` and `@zfc.description en Text`. */
+/** Extracts localized JSDoc tags: `@exensial.title es Título` and `@exensial.description en Text`. */
 function parseDocumentation(comment?: string): Documentation | undefined {
   if (!comment) return undefined;
   const documentation: Documentation = {};
   for (const line of comment.split("\n")) {
-    const tag = line.replace(/^\s*\*?\s*/, "").match(/^@zfc\.(title|description)\s+([\w-]+)\s+(.+)$/);
+    const tag = line.replace(/^\s*\*?\s*/, "").match(/^@exensial\.(title|description)\s+([\w-]+)\s+(.+)$/);
     if (!tag) continue;
     const [, property, locale, text] = tag;
     const key = property as keyof Documentation;
