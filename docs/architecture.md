@@ -5,13 +5,13 @@
 ZFC expone conjuntos definidos en tiempo de ejecución como recursos REST. Un conjunto se crea enviando un alias de tipo TypeScript simplificado; una vez desplegado, recibe las rutas CRUD habituales sin añadir rutas manuales.
 
 ```text
-POST /v1/entities          → define el conjunto `books`
-POST /v1/books             → crea un elemento o importa una lista
-GET /v1/books              → lista elementos
-GET /v1/books/:id          → obtiene un elemento
-PUT /v1/books/:id          → lo reemplaza
-PATCH /v1/books/:id        → lo modifica parcialmente
-DELETE /v1/books/:id       → lo elimina
+POST /v1/entities          → define el conjunto `tasks`
+POST /v1/tasks             → crea un elemento o importa una lista
+GET /v1/tasks              → lista elementos
+GET /v1/tasks/:id          → obtiene un elemento
+PUT /v1/tasks/:id          → lo reemplaza
+PATCH /v1/tasks/:id        → lo modifica parcialmente
+DELETE /v1/tasks/:id       → lo elimina
 ```
 
 ## Flujo de una solicitud
@@ -76,7 +76,7 @@ Son `EntityModule` normales con repositorios propios, por lo que también se con
 El parser acepta un subconjunto deliberadamente pequeño de alias TypeScript:
 
 ```ts
-type Book = {
+type Task = {
   title: string;
   pages: number;
   published?: boolean;
@@ -91,13 +91,13 @@ La versión forma parte del patrón de URL: `/v1/:entity/:id?`. El runtime no me
 
 | Método y ruta | Acción normalizada | Body |
 | --- | --- | --- |
-| `GET /v1/books` | `list` | — |
-| `POST /v1/books` | `create` | objeto |
-| `POST /v1/books` | `bulkCreate` | array de objetos |
-| `GET /v1/books/:id` | `get` | — |
-| `PUT /v1/books/:id` | `replace` | objeto completo |
-| `PATCH /v1/books/:id` | `update` | objeto parcial |
-| `DELETE /v1/books/:id` | `delete` | — |
+| `GET /v1/tasks` | `list` | — |
+| `POST /v1/tasks` | `create` | objeto |
+| `POST /v1/tasks` | `bulkCreate` | array de objetos |
+| `GET /v1/tasks/:id` | `get` | — |
+| `PUT /v1/tasks/:id` | `replace` | objeto completo |
+| `PATCH /v1/tasks/:id` | `update` | objeto parcial |
+| `DELETE /v1/tasks/:id` | `delete` | — |
 
 La validación conserva solo el contrato declarado por la entidad y rechaza campos desconocidos o tipos inválidos antes de invocar el repositorio. Para importación masiva se validan todos los objetos antes de realizar la primera escritura.
 
@@ -111,15 +111,15 @@ La definición del tipo acepta JSDoc como convención de documentación. Los tag
 
 ```ts
 /**
- * @zfc.title en Books
- * @zfc.title es Libros
- * @zfc.description en A catalog of books
+ * @zfc.title en Tasks
+ * @zfc.title es Tareas
+ * @zfc.description en A task collection
  */
-type Book = {
+type Task = {
   /**
    * @zfc.title en Title
    * @zfc.title es Título
-   * @zfc.description en The book's public title
+   * @zfc.description en The task's public title
    */
   name: string;
 }

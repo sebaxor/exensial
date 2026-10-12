@@ -15,22 +15,22 @@ Define un conjunto enviando un alias de tipo TypeScript (por ahora admite campos
 ```bash
 curl -X POST http://localhost:3000/v1/entities \
   -H 'content-type: application/json' \
-  -d '{"name":"books","definition":"type Book = { title: string; pages: number; published?: boolean }"}'
+  -d '{"name":"tasks","definition":"type Task = { title: string; completed?: boolean }"}'
 ```
 
 Después, el nombre se convierte en el recurso REST:
 
 ```bash
 # Crear
-curl -X POST http://localhost:3000/v1/books -H 'content-type: application/json' -d '{"title":"Dune","pages":412}'
+curl -X POST http://localhost:3000/v1/tasks -H 'content-type: application/json' -d '{"title":"Draft the report"}'
 
 # Listar / leer uno
-curl http://localhost:3000/v1/books
-curl http://localhost:3000/v1/books/:id
+curl http://localhost:3000/v1/tasks
+curl http://localhost:3000/v1/tasks/:id
 
 # Actualizar / borrar
-curl -X PATCH http://localhost:3000/v1/books/:id -H 'content-type: application/json' -d '{"pages":500}'
-curl -X DELETE http://localhost:3000/v1/books/:id
+curl -X PATCH http://localhost:3000/v1/tasks/:id -H 'content-type: application/json' -d '{"completed":true}'
+curl -X DELETE http://localhost:3000/v1/tasks/:id
 ```
 
 `entities` es también una entidad del sistema: su repositorio conserva las definiciones y sus hooks de ciclo de vida despliegan, actualizan o retiran las entidades dinámicas. Los datos son intencionalmente en memoria para este primer corte: al reiniciar el proceso se vacían.

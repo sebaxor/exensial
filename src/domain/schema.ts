@@ -3,7 +3,7 @@ import type { Documentation, FieldDefinition, ScalarType } from "./entity";
 /** Parses the deliberately small TypeScript type-alias subset supported by ZFC. */
 export function parseEntitySource(source: string): { typeName: string; fields: Record<string, FieldDefinition>; documentation?: Documentation } {
   const match = source.match(/^\s*(?:\/\*\*([\s\S]*?)\*\/\s*)?type\s+(\w+)\s*=\s*\{([\s\S]*)\}\s*;?\s*$/);
-  if (!match) throw new ValidationError("Expected a TypeScript type alias, e.g. type Book = { title: string }");
+  if (!match) throw new ValidationError("Expected a TypeScript type alias, e.g. type Task = { title: string }");
   const [, entityComment, typeName, body] = match;
 
   const fields: Record<string, FieldDefinition> = {};
