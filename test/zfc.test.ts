@@ -103,6 +103,9 @@ test("binds trusted operation middleware to a runtime-defined entity", async () 
         const input = context.input as Record<string, unknown>;
         input.title = String(input.title).trim().toUpperCase();
         await next();
+      },
+      list: async (context) => {
+        context.result = [];
       }
     }
   };
@@ -121,10 +124,11 @@ test("binds trusted operation middleware to a runtime-defined entity", async () 
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "  hello  " })
     });
     assert.equal((await created.json()).title, "HELLO");
+    assert.deepEqual(await (await fetch(`${baseUrl}/v1/announcements`)).json(), []);
 
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.deepEqual(openapi.components.schemas.announcements["x-exensial-context"], {
-      namespace: "demo.content", module: "example/normalize-title", operations: ["create"]
+      namespace: "demo.content", module: "example/normalize-title", operations: ["create", "list"]
     });
   }, { behaviorModules: [normalizeTitle] });
 });
