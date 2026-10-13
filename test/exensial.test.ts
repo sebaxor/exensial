@@ -264,6 +264,9 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /t\('new','New'\)/);
     assert.match(consolePage, /type="checkbox"/);
     assert.match(consolePage, /CodeMirror/);
+    assert.match(consolePage, /requestAnimationFrame\(setupCodeEditors\)/);
+    assert.match(consolePage, /lineWrapping:true/);
+    assert.match(consolePage, /#editor\.code-editor/);
     assert.match(consolePage, /codemirror-typescript\.js\?v=2/);
     assert.match(consolePage, /grid-checkbox/);
     assert.match(consolePage, /return value==='true'/);
