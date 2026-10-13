@@ -142,6 +142,9 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     const spanishOpenapi = await (await fetch(`${baseUrl}/openapi.json?lang=es`)).json();
     assert.match(spanishOpenapi.info.description, /Empieza aquí: define una colección/);
     assert.match(spanishOpenapi.info.description, /Esto crea una colección de tareas/);
+    assert.equal(spanishOpenapi.paths["/v1/auth/login"].post.summary, "Crear una sesión JWT local");
+    assert.match(spanishOpenapi.paths["/v1/auth/login"].post.description, /Valida un usuario local/);
+    assert.match(spanishOpenapi.components.schemas.localizations.description, /Traducciones en tiempo de ejecución/);
     assert.equal(openapi.components.schemas.entities.title, "Entity catalog");
     assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].control, "textarea");
     assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].tableHidden, true);

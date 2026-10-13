@@ -10,7 +10,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
-  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths()] : []), ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
+  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
   if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? [], capabilities.roles ?? []);
   return {
     openapi: "3.0.4",
@@ -53,13 +53,14 @@ function applyAuthorizationMetadata(paths: Record<string, unknown>, permissions:
 
 function matchesPath(pattern: string, path: string): boolean { return pattern.endsWith("*") ? path.startsWith(pattern.slice(0, -1)) : pattern === path; }
 
-function authenticationPaths(): Record<string, unknown> {
+function authenticationPaths(language: string, localizations: LocalizationEntry[]): Record<string, unknown> {
+  const text = (key: string, fallback: LocalizedText) => localizedValue(localizations, language, `openapi.authentication.${key}`, fallback);
   return {
     "/v1/auth/login": {
       post: {
-        tags: ["Authentication"], operationId: "login", summary: "Create a local JWT session", description: "Checks a local Exensial user and returns a short-lived Bearer token. A future identity-provider adapter can populate the same principal context.",
+        tags: [text("tag", { en: "Authentication", es: "Autenticación" })], operationId: "login", summary: text("login.summary", { en: "Create a local JWT session", es: "Crear una sesión JWT local" }), description: text("login.description", { en: "Checks a local Exensial user and returns a short-lived Bearer token. A future identity-provider adapter can populate the same principal context.", es: "Valida un usuario local de Exensial y devuelve un token Bearer de duración limitada. Un adaptador futuro de proveedor de identidad puede proporcionar el mismo contexto de principal." }),
         requestBody: { required: true, content: jsonContent({ type: "object", required: ["username", "password"], properties: { username: { type: "string" }, password: { type: "string", format: "password" } } }, { username: "admin", password: "admin123" }) },
-        responses: { 200: { description: "Authenticated", content: jsonContent({ type: "object", properties: { accessToken: { type: "string" }, tokenType: { type: "string" }, expiresIn: { type: "integer" } } }, { accessToken: "eyJ...", tokenType: "Bearer", expiresIn: 28800 }) }, 401: { description: "Invalid credentials" } }
+        responses: { 200: { description: text("login.authenticated", { en: "Authenticated", es: "Autenticado" }), content: jsonContent({ type: "object", properties: { accessToken: { type: "string" }, tokenType: { type: "string" }, expiresIn: { type: "integer" } } }, { accessToken: "eyJ...", tokenType: "Bearer", expiresIn: 28800 }) }, 401: { description: text("login.invalidCredentials", { en: "Invalid credentials", es: "Credenciales inválidas" }) } }
       }
     }
   };

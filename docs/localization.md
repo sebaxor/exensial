@@ -15,6 +15,7 @@
 The stable metadata keys currently supported by generated OpenAPI and the Console are:
 
 - `openapi.info.title` and `openapi.info.description`
+- `openapi.authentication.tag`, `openapi.authentication.login.summary`, `openapi.authentication.login.description`, `openapi.authentication.login.authenticated`, and `openapi.authentication.login.invalidCredentials` for generated local-authentication documentation
 - `entity.<namespace.name-or-name>.title`
 - `entity.<namespace.name-or-name>.description`
 - `entity.<namespace.name-or-name>.field.<field>.title`
