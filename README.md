@@ -50,7 +50,7 @@ curl -X POST http://localhost:3000/v1/acme.work/tasks \
 
 Every recognized request and normalized response are also stored as the system entities `/v1/requests` and `/v1/responses`. A response reuses its request's `id`, so records correlate directly without a second relation field. Requests include `receivedAt`; responses include `completedAt` and `durationMs`, enabling timing and throughput analysis. API documentation is generated from the active entities at `/openapi.json`; Swagger UI is served at `/docs`.
 
-The dependency-free runtime console at `/console` reads that same OpenAPI document and generates a navigation menu plus list, create, edit, and delete screens for every active entity.
+The dependency-free runtime console at `/console` reads that same OpenAPI document and generates a navigation menu plus list, create, edit, and delete screens for every active entity. Selecting an entity writes a shareable hash route such as `/console#/library.books`; opening `/console` again restores the last valid entity locally.
 
 Collection `GET` is paginated by default: `?page=1&perPage=25` (maximum 100). Responses expose `X-Total-Count`, `X-Page`, `X-Per-Page`, and RFC 8288 `Link` navigation headers. The console remembers its selected page size locally.
 

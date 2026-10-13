@@ -116,6 +116,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     const consolePage = await (await fetch(`${baseUrl}/console`)).text();
     assert.match(consolePage, /Runtime entity console/);
     assert.match(consolePage, /openapi\.json/);
+    assert.match(consolePage, /exensial\.lastConsoleRoute/);
+    assert.match(consolePage, /hashchange/);
   });
 });
 
