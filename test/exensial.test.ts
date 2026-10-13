@@ -161,6 +161,7 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /type="checkbox"/);
     assert.match(consolePage, /grid-checkbox/);
     assert.match(consolePage, /return value==='true'/);
+    assert.match(consolePage, /auth-form/);
   });
 });
 
