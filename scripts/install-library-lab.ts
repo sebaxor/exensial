@@ -141,6 +141,8 @@ async function resetLibrary(): Promise<void> {
   for (const entity of entities.filter((item) => item.namespace === "library" && ["loans", "members", "books"].includes(item.name))) {
     await request("DELETE", `/v1/entities/${entity.id}`);
   }
+  const localizations = await request("GET", "/v1/localizations") as Array<{ id: string; key: string }>;
+  for (const entry of localizations.filter((item) => item.key.startsWith("entity.library."))) await request("DELETE", `/v1/localizations/${entry.id}`);
 }
 
 async function install(): Promise<void> {
@@ -148,6 +150,15 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "books", namespace: "library", group: "Library", definition: booksDefinition, code: booksCode });
   await request("POST", "/v1/entities", { name: "members", namespace: "library", group: "Library", definition: membersDefinition, code: membersCode });
   await request("POST", "/v1/entities", { name: "loans", namespace: "library", group: "Library", definition: loansDefinition, code: loansCode });
+  await request("POST", "/v1/localizations", [
+    { locale: "es", key: "entity.library.books.title", value: "Libros" },
+    { locale: "es", key: "entity.library.members.title", value: "Miembros" },
+    { locale: "es", key: "entity.library.loans.title", value: "Préstamos" },
+    { locale: "es", key: "entity.library.books.field.title.title", value: "Título" },
+    { locale: "es", key: "entity.library.books.field.copiesAvailable.title", value: "Copias disponibles" },
+    { locale: "es", key: "entity.library.loans.field.book.title", value: "Libro" },
+    { locale: "es", key: "entity.library.loans.field.member.title", value: "Miembro" }
+  ]);
 
   const featuredBooks = [
     { title: "  The Left Hand of Darkness  ", author: " Ursula K. Le Guin ", isbn: "978-0441478125", copiesTotal: 2 },

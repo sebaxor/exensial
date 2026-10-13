@@ -89,7 +89,7 @@ export default {
 
 ## Install and reset the lab
 
-The complete executable definition —schemas, JSDoc metadata, TypeScript domain modules, and fixture data— lives in [install-library-lab.ts](../../scripts/install-library-lab.ts). It resets only `library/books`, `library/members`, and `library/loans`, then recreates them through the public REST endpoint.
+The complete executable definition —schemas, JSDoc metadata, TypeScript domain modules, runtime Spanish labels, and fixture data— lives in [install-library-lab.ts](../../scripts/install-library-lab.ts). It resets only the library entities and their `entity.library.*` localization records, then recreates them through the public REST endpoint.
 
 ```bash
 npm start
