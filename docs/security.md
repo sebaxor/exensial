@@ -47,3 +47,19 @@ curl -X POST http://localhost:3000/v1/library/books \
 ```
 
 The generated OpenAPI document exposes the login endpoint and Bearer scheme. Individual entity operations remain generic because authorization is a runtime policy, not a change to domain logic.
+
+## OpenAPI and Console metadata
+
+The standard OpenAPI `security: [{ bearerAuth: [] }]` property appears only on operations that currently match at least one permission. Exensial also adds the non-standard, UI-oriented `x-exensial-authorization` extension to that operation:
+
+```json
+{
+  "security": [{ "bearerAuth": [] }],
+  "x-exensial-authorization": {
+    "required": true,
+    "rules": [{ "role": "library-admin", "method": "POST", "path": "/v1/library/books*", "effect": "allow" }]
+  }
+}
+```
+
+The extension is a snapshot of the runtime policy, not a security decision by itself: the middleware remains authoritative. The Console uses it to hide collections without readable access and create, edit, or delete controls the active principal cannot use. It offers **Sign in** when protected operations exist, stores the issued token in browser storage, and sends it as a Bearer token. Swagger can use the standard scheme through its Authorize control.

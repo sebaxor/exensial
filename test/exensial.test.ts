@@ -58,6 +58,9 @@ test("enforces endpoint permissions while leaving unconfigured endpoints anonymo
     await fetch(`${baseUrl}/v1/roles`, { method: "POST", headers: json, body: JSON.stringify({ name: "admin" }) });
     await fetch(`${baseUrl}/v1/users`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", passwordHash: hashPassword("secret"), roles: ["admin"], active: true }) });
     await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: "admin", method: "POST", path: "/v1/library/books*", effect: "allow" }]) });
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.equal(openapi.paths["/v1/library/books"].post.security[0].bearerAuth.length, 0);
+    assert.equal(openapi.paths["/v1/library/books"].post["x-exensial-authorization"].rules[0].role, "admin");
     assert.equal((await fetch(`${baseUrl}/v1/library/books`)).status, 200);
     assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: json, body: JSON.stringify({ title: "Blocked" }) })).status, 401);
     const login = await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: "secret" }) });

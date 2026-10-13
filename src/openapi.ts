@@ -4,13 +4,14 @@ import { localizedValue, type LocalizationEntry } from "./application/localizati
 type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
-export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; language?: string; localizations?: LocalizationEntry[]; }
+export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; permissions?: Array<Record<string, unknown>>; language?: string; localizations?: LocalizationEntry[]; }
 
 export function createOpenApi(definitions: EntityDefinition[], capabilities: OpenApiOptions = {}): Record<string, unknown> {
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
   const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths()] : []), ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
+  if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? []);
   return {
     openapi: "3.0.4",
     info: {
@@ -21,18 +22,34 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
     "x-exensial-language": language,
     "x-exensial-locales": [...new Set(["en", ...localizations.map((entry) => entry.locale)])].sort(),
     "x-exensial-ui-localization": Object.fromEntries(localizations.filter((entry) => entry.locale === language && entry.key.startsWith("ui.")).map((entry) => [entry.key, entry.value])),
-    "x-exensial-capabilities": capabilities.exensialQuery ? {
+    "x-exensial-capabilities": {
+      ...(capabilities.security ? { security: { loginPath: "/v1/auth/login", scheme: "bearerAuth", description: "Operations with x-exensial-authorization require a matching JWT role." } } : {}),
+      ...(capabilities.exensialQuery ? {
       query: {
         exensialQuery: {
           root: "/v1/query/exensial",
           description: "Optional OData-like read capability. Supports $filter (contains, startswith, endswith, eq, ne, gt, ge, lt, le joined with and), $skip, and $top. Only fields annotated as searchable or filterable can be queried."
         }
       }
-    } : {},
+    } : {}) },
     paths,
     components: { schemas, ...(capabilities.security ? { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT", description: "Obtain a token from POST /v1/auth/login and send it as Authorization: Bearer <token>. Endpoint permissions decide whether authentication is required." } } } : {}) }
   };
 }
+
+function applyAuthorizationMetadata(paths: Record<string, unknown>, permissions: Array<Record<string, unknown>>): void {
+  for (const [path, item] of Object.entries(paths)) {
+    for (const [method, operation] of Object.entries(item as Record<string, unknown>)) {
+      if (!/^(get|post|put|patch|delete)$/i.test(method) || !operation || typeof operation !== "object") continue;
+      const rules = permissions.filter((permission) => (String(permission.method) === "*" || String(permission.method).toUpperCase() === method.toUpperCase()) && matchesPath(String(permission.path), path));
+      if (!rules.length) continue;
+      const metadata = rules.map(({ role, effect, method: ruleMethod, path: rulePath }) => ({ role, effect, method: ruleMethod, path: rulePath }));
+      Object.assign(operation as Record<string, unknown>, { security: [{ bearerAuth: [] }], "x-exensial-authorization": { required: true, rules: metadata } });
+    }
+  }
+}
+
+function matchesPath(pattern: string, path: string): boolean { return pattern.endsWith("*") ? path.startsWith(pattern.slice(0, -1)) : pattern === path; }
 
 function authenticationPaths(): Record<string, unknown> {
   return {
