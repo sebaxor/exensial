@@ -75,10 +75,14 @@ test("enforces endpoint permissions while leaving unconfigured endpoints anonymo
     const { accessToken } = await login.json() as { accessToken: string };
     assert.equal((await fetch(`${baseUrl}/v1/library/books`, { headers: { authorization: `Bearer ${accessToken}` } })).status, 200);
     assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: { ...json, authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ title: "Allowed" }) })).status, 201);
+    const profile = await (await fetch(`${baseUrl}/v1/auth/profile`, { headers: { authorization: `Bearer ${accessToken}` } })).json() as { username: string };
+    assert.equal(profile.username, "admin");
+    const profileUpdate = await (await fetch(`${baseUrl}/v1/auth/profile`, { method: "PATCH", headers: { ...json, authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ username: "administrator", email: "administrator@example.com" }) })).json() as { accessToken: string; user: { email: string } };
+    assert.equal(profileUpdate.user.email, "administrator@example.com");
     const users = await (await fetch(`${baseUrl}/v1/users`, { headers: { authorization: `Bearer ${accessToken}` } })).json() as Array<Record<string, unknown>>;
     assert.equal("passwordHash" in users[0], false);
-    assert.equal((await fetch(`${baseUrl}/v1/auth/change-password`, { method: "POST", headers: { ...json, authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ currentPassword: "secret", newPassword: "new-secret" }) })).status, 204);
-    assert.equal((await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: "new-secret" }) })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/v1/auth/change-password`, { method: "POST", headers: { ...json, authorization: `Bearer ${profileUpdate.accessToken}` }, body: JSON.stringify({ currentPassword: "secret", newPassword: "new-secret" }) })).status, 204);
+    assert.equal((await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ username: "administrator", password: "new-secret" }) })).status, 200);
   });
 });
 

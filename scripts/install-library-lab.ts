@@ -275,6 +275,8 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.newPassword", value: "Contraseña nueva" },
     { locale: "es", key: "ui.updatePassword", value: "Actualizar contraseña" },
     { locale: "es", key: "ui.passwordUpdated", value: "Contraseña actualizada." },
+    { locale: "es", key: "ui.editProfile", value: "Editar mi perfil" },
+    { locale: "es", key: "ui.email", value: "Correo electrónico" },
     { locale: "es", key: "ui.group.Library", value: "Biblioteca" },
     { locale: "es", key: "ui.group.System", value: "Sistema" },
     { locale: "es", key: "entity.library.books.title", value: "Libros" },
@@ -347,11 +349,13 @@ async function install(): Promise<void> {
   ];
   const generatedBooks = Array.from({ length: 97 }, (_, index) => ({ title: `Library sample ${index + 4}`, author: `Sample author ${index + 1}`, isbn: `978-000${String(index + 4).padStart(6, "0")}`, copiesTotal: (index % 4) + 1 }));
   const books = (await request("POST", "/v1/library/books", [...featuredBooks, ...generatedBooks])).items;
-  const members = (await request("POST", "/v1/library/members", [
+  const featuredMembers = [
     { name: " Ana Torres ", email: " ANA.TORRES@EXAMPLE.COM " },
     { name: " Mateo Rios ", email: " MATEO.RIOS@EXAMPLE.COM " },
     { name: " Sofia Perez ", email: " SOFIA.PEREZ@EXAMPLE.COM " }
-  ])).items;
+  ];
+  const generatedMembers = Array.from({ length: 21 }, (_, index) => ({ name: `Library member ${index + 4}`, email: `member${index + 4}@library.example` }));
+  const members = (await request("POST", "/v1/library/members", [...featuredMembers, ...generatedMembers])).items;
   await request("POST", "/v1/library/loans", { book: books[0].id, member: members[0].id, borrowedAt: "2026-10-05T10:00:00.000Z", dueAt: "2026-10-19T23:59:59.000Z" });
   await request("POST", "/v1/library/loans", { book: books[0].id, member: members[1].id, borrowedAt: "2026-10-06T10:00:00.000Z", dueAt: "2026-10-20T23:59:59.000Z" });
   const returned = await request("POST", "/v1/library/loans", { book: books[1].id, member: members[2].id, borrowedAt: "2026-09-20T10:00:00.000Z", dueAt: "2026-10-04T23:59:59.000Z" });

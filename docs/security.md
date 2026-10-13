@@ -13,6 +13,8 @@ The layer installs three ordinary System entities, so they are available through
 
 An authenticated user changes their own password with `POST /v1/auth/change-password` and `{ "currentPassword", "newPassword" }`. The Console exposes this action from the identity card at the bottom of the navigation bar.
 
+An authenticated user can read and update their own public profile at `GET` / `PATCH /v1/auth/profile`. Only `username` and `email` are accepted by the update endpoint; roles, activation, and password hashes remain administrative concerns. A successful profile update returns a refreshed JWT so the Console immediately reflects a changed username.
+
 ## Policy evaluation
 
 1. Find permissions with the request method (or `*`) and matching path.

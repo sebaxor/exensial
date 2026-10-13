@@ -100,8 +100,30 @@ export function authenticationMiddleware(runtime: EntityRuntime, enabled = true)
       context.domainResponse = { status: 204 };
       return;
     }
+    if (url.pathname === "/v1/auth/profile") {
+      if (!context.principal) throw new UnauthorizedError("Authentication is required");
+      const user = runtime.findRecord("users", context.principal.id);
+      if (!user) throw new UnauthorizedError("Authenticated user no longer exists");
+      if (input.method === "GET") {
+        context.domainResponse = { status: 200, body: profile(user) };
+        return;
+      }
+      if (input.method !== "PATCH") throw new MethodNotAllowedError();
+      const payload = parseJson(input.body ?? "") as Record<string, unknown>;
+      if (Object.keys(payload).some((key) => !["username", "email"].includes(key))) throw new ValidationError("Only username and email can be updated in the profile");
+      if ("username" in payload && !String(payload.username ?? "").trim()) throw new ValidationError("Username cannot be empty");
+      await runtime.execute({ apiVersion: "v1", entityName: "users", action: "update", id: user.id, payload: { kind: "one", value: payload } });
+      const current = runtime.findRecord("users", user.id)!;
+      const principal = { ...context.principal, username: String(current.username) };
+      context.domainResponse = { status: 200, body: { user: profile(current), accessToken: issueToken(principal, process.env.EXENSIAL_JWT_SECRET ?? "exensial-development-secret") } };
+      return;
+    }
     await next();
   };
+}
+
+function profile(user: Record<string, unknown>): Record<string, unknown> {
+  return { id: user.id, username: user.username, email: user.email };
 }
 
 /** Enforces endpoint policy after REST route capture and before any entity mutation. */
