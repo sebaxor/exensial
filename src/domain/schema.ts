@@ -41,12 +41,12 @@ export function validateRecord(
   const record = payload as Record<string, unknown>;
   for (const [name, value] of Object.entries(record)) {
     const field = fields[name];
-    if (!field) throw new ValidationError(`Unknown field: ${name}`);
-    if (!hasExpectedType(value, field.type)) throw new ValidationError(`Field ${name} must be ${field.type}`);
+    if (!field) throw new ValidationError(`Unknown field "${name}".`);
+    if (!hasExpectedType(value, field.type)) throw new ValidationError(`Invalid value for field "${name}": expected ${field.type}.`);
   }
   if (!partial) {
     for (const [name, field] of Object.entries(fields)) {
-      if (field.required && !(name in record)) throw new ValidationError(`Missing required field: ${name}`);
+      if (field.required && !(name in record)) throw new ValidationError(`Missing required field "${name}".`);
     }
   }
   return record;

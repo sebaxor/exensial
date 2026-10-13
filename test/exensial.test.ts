@@ -50,6 +50,15 @@ test("returns correct errors for duplicate entities and invalid record routes", 
   });
 });
 
+test("reports validation errors with the offending field name", async () => {
+  await withApi(async (baseUrl) => {
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "notes", definition: "type Note = { title: string }" }) });
+    const response = await fetch(`${baseUrl}/v1/notes`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: null }) });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error, 'Invalid value for field "title": expected string.');
+  });
+});
+
 test("updates and removes a dynamic entity through the same REST CRUD", async () => {
   await withApi(async (baseUrl) => {
     const created = await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "notes", definition: "type Note = { body: string }" }) });
