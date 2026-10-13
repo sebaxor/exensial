@@ -121,6 +121,16 @@ export class EntityRuntime {
     return context.result;
   }
 
+  /** Removes infrastructure-sensitive fields only at the HTTP representation boundary. */
+  publicResult(request: DomainRequest, result: EntityRecord | EntityRecord[] | undefined): EntityRecord | EntityRecord[] | undefined {
+    if (!result) return result;
+    const entity = this.resolve(request.entityName, request.namespace, request.apiVersion);
+    if (!entity) throw new EntityNotFoundError("Entity not found");
+    const sensitive = Object.entries(entity.definition.fields).filter(([, field]) => field.ui?.sensitive).map(([name]) => name);
+    const redact = (record: EntityRecord) => Object.fromEntries(Object.entries(record).filter(([name]) => !sensitive.includes(name))) as EntityRecord;
+    return Array.isArray(result) ? result.map(redact) : redact(result);
+  }
+
   private prepareContext(entity: ActiveEntity, context: EntityOperationContext): void {
     const { request } = context;
     if (request.action === "create") context.input = validateRecord(this.onePayload(request.payload), entity.definition.fields);

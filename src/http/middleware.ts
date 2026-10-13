@@ -213,7 +213,7 @@ export function entityLifecycleMiddleware(runtime: EntityRuntime): Middleware {
   return async (context) => {
     const request = context.domainRequest;
     if (!request) return;
-    const result = await runtime.execute(request);
+    const result = runtime.publicResult(request, await runtime.execute(request));
     if (request.action === "delete") return setResponse(context, 204);
     if (request.action === "bulkCreate") return setResponse(context, 201, { items: result });
     if (request.action === "list") return setResponse(context, 200, result, paginationHeaders(context, runtime, request));

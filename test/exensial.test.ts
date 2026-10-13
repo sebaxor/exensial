@@ -55,18 +55,25 @@ test("enforces endpoint permissions while leaving unconfigured endpoints anonymo
   await withApi(async (baseUrl) => {
     const json = { "content-type": "application/json" };
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: json, body: JSON.stringify({ name: "books", namespace: "library", definition: "type Book = { title: string }" }) });
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: json, body: JSON.stringify({ name: "members", namespace: "library", definition: "type Member = { name: string }" }) });
     await fetch(`${baseUrl}/v1/roles`, { method: "POST", headers: json, body: JSON.stringify({ name: "admin" }) });
-    await fetch(`${baseUrl}/v1/users`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", passwordHash: hashPassword("secret"), roles: ["admin"], active: true }) });
-    await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: "admin", method: "POST", path: "/v1/library/books*", effect: "allow" }]) });
+    await fetch(`${baseUrl}/v1/users`, { method: "POST", headers: json, body: JSON.stringify([{ username: "admin", passwordHash: hashPassword("secret"), roles: ["admin"], active: true }, { username: "reader", passwordHash: hashPassword("reader-secret"), roles: ["reader"], active: true }]) });
+    await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: "anonymous", method: "GET", path: "/v1/library/books*", effect: "allow" }, { role: "reader", method: "GET", path: "/v1/*", effect: "allow" }, { role: "admin", method: "POST", path: "/v1/library/books*", effect: "allow" }, { role: "admin", method: "GET", path: "/v1/users*", effect: "allow" }]) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.paths["/v1/library/books"].post.security[0].bearerAuth.length, 0);
     assert.equal(openapi.paths["/v1/library/books"].post["x-exensial-authorization"].rules[0].role, "admin");
     assert.equal((await fetch(`${baseUrl}/v1/library/books`)).status, 200);
+    assert.equal((await fetch(`${baseUrl}/v1/library/members`)).status, 401);
     assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: json, body: JSON.stringify({ title: "Blocked" }) })).status, 401);
+    const readerLogin = await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ username: "reader", password: "reader-secret" }) });
+    const { accessToken: readerToken } = await readerLogin.json() as { accessToken: string };
+    assert.equal((await fetch(`${baseUrl}/v1/library/members`, { headers: { authorization: `Bearer ${readerToken}` } })).status, 200);
     const login = await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: "secret" }) });
     assert.equal(login.status, 200);
     const { accessToken } = await login.json() as { accessToken: string };
     assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: { ...json, authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ title: "Allowed" }) })).status, 201);
+    const users = await (await fetch(`${baseUrl}/v1/users`, { headers: { authorization: `Bearer ${accessToken}` } })).json() as Array<Record<string, unknown>>;
+    assert.equal("passwordHash" in users[0], false);
   });
 });
 

@@ -201,6 +201,8 @@ async function installPermissions(): Promise<void> {
   ]);
   const protectedPaths = ["/v1/library/members*", "/v1/library/loans*", "/v1/entities*", "/v1/localizations*", "/v1/requests*", "/v1/responses*", "/v1/roles*", "/v1/users*", "/v1/permissions*"];
   const permissions = [
+    { role: "anonymous", method: "GET", path: "/v1/library/books*", effect: "allow" },
+    { role: "library-reader", method: "GET", path: "/v1/*", effect: "allow" },
     ...["POST", "PUT", "PATCH", "DELETE"].map((method) => ({ role: "library-admin", method, path: "/v1/library/books*", effect: "allow" })),
     ...protectedPaths.map((path) => ({ role: "library-admin", method: "*", path, effect: "allow" }))
   ];

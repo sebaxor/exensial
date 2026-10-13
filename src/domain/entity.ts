@@ -11,6 +11,8 @@ export type UiControl = "text" | "textarea" | "email" | "date" | "datetime" | "n
 
 export interface FieldUi {
   hidden?: boolean;
+  /** Excluded from HTTP representations while remaining available to trusted server-side logic. */
+  sensitive?: boolean;
   control?: UiControl;
   /** Allows text search operators in optional query capabilities. */
   searchable?: boolean;

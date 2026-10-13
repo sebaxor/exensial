@@ -44,7 +44,8 @@ function applyAuthorizationMetadata(paths: Record<string, unknown>, permissions:
       const rules = permissions.filter((permission) => (String(permission.method) === "*" || String(permission.method).toUpperCase() === method.toUpperCase()) && matchesPath(String(permission.path), path));
       if (!rules.length) continue;
       const metadata = rules.map(({ role, effect, method: ruleMethod, path: rulePath }) => ({ role, effect, method: ruleMethod, path: rulePath }));
-      Object.assign(operation as Record<string, unknown>, { security: [{ bearerAuth: [] }], "x-exensial-authorization": { required: true, rules: metadata } });
+      const anonymous = rules.some((rule) => rule.role === "anonymous" && rule.effect === "allow");
+      Object.assign(operation as Record<string, unknown>, { ...(anonymous ? {} : { security: [{ bearerAuth: [] }] }), "x-exensial-authorization": { required: !anonymous, anonymous, rules: metadata } });
     }
   }
 }

@@ -13,7 +13,7 @@ The layer installs three ordinary System entities, so they are available through
 ## Policy evaluation
 
 1. Find permissions with the request method (or `*`) and matching path.
-2. If there are no matching rules, the endpoint permits anonymous access. This makes public endpoints explicit by omission.
+2. If there are no matching rules, the endpoint permits anonymous access. A rule for the special `anonymous` role can also keep one endpoint public while a broader role rule covers related routes.
 3. If rules exist, a missing or invalid Bearer token returns `401` with `WWW-Authenticate: Bearer`.
 4. A signed-in user whose roles do not match an allow returns `403`. A matching deny also returns `403`.
 
@@ -33,7 +33,7 @@ The protected variant uses the same runtime business definitions and adds securi
 npm run lab:library:permissions
 ```
 
-It creates `reader` / `reader123` with the `library-reader` role and `admin` / `admin123` with `library-admin`. Book reads stay anonymous; changes to books, all member and loan routes, and System catalogs require the admin token.
+It creates `reader` / `reader123` with the `library-reader` role and `admin` / `admin123` with `library-admin`. Book reads stay anonymous. The reader can use every `GET` endpoint; changes to books, members, loans, and System catalogs require the admin token. Sensitive fields such as `users.passwordHash` are redacted from HTTP representations for every role.
 
 ```bash
 curl -sS -X POST http://localhost:3000/v1/auth/login \
