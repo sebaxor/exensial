@@ -108,6 +108,28 @@ type Task = { title: string };
 
 The supported operation names are `list`, `create`, `get`, `replace`, `update`, `delete`, and `query`. A runtime override uses `entity.<namespace.name-or-name>.operation.<operation>.summary`.
 
+## Default values
+
+Use `@exensial.default` on a field to provide a JSON default. The value is applied when that field is omitted during a `POST` create or bulk import. It is not re-applied by `PUT` or `PATCH`, so an update remains explicit.
+
+```ts
+type Task = {
+  title: string;
+  /** @exensial.default "draft" */
+  status: string;
+  /** @exensial.default false */
+  completed?: boolean;
+  /** @exensial.default 3 */
+  priority?: number;
+  /** @exensial.default {"labels":[]} */
+  metadata?: json;
+}
+```
+
+The annotation value must be valid JSON: quote strings, use `true` or `false` for booleans, and use JSON object or array syntax for `json` fields. A field with a default is optional in create input, even if it is not marked with `?` in the TypeScript shape.
+
+Exensial publishes this through the standard OpenAPI Schema Object `default` property—no custom extension is needed. Generic clients can use it safely; the bundled Console uses it to prefill the **New record** form.
+
 ## UI metadata and relations
 
 Field JSDoc can also declare presentation hints. Exensial exports them under the vendor extension `x-exensial-ui` in OpenAPI; consumers that do not understand the extension can safely ignore it.

@@ -101,7 +101,8 @@ type Member = {
    * @exensial.relation users label=username */
   user?: User;
   /** @exensial.title en Active
-   * @exensial.title es Activo */
+   * @exensial.title es Activo
+   * @exensial.default true */
   active?: boolean;
 }`;
 

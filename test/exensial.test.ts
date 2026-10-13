@@ -94,6 +94,35 @@ test("reports validation errors with the offending field name", async () => {
   });
 });
 
+test("applies JSDoc defaults on creation and exposes standard OpenAPI defaults", async () => {
+  await withApi(async (baseUrl) => {
+    const definition = `type Task = {
+  title: string;
+  /** @exensial.default "draft" */
+  status: string;
+  /** @exensial.default false */
+  completed?: boolean;
+  /** @exensial.default 3 */
+  priority?: number;
+  /** @exensial.default {"labels":[]} */
+  metadata?: json;
+}`;
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "defaulted-tasks", definition }) });
+    const created = await fetch(`${baseUrl}/v1/defaulted-tasks`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Write documentation" }) });
+    assert.equal(created.status, 201);
+    const record = await created.json() as Record<string, unknown>;
+    assert.equal(typeof record.id, "string");
+    assert.deepEqual({ ...record, id: undefined }, { id: undefined, title: "Write documentation", status: "draft", completed: false, priority: 3, metadata: { labels: [] } });
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    const properties = openapi.components.schemas["defaulted-tasks"].properties;
+    assert.equal(properties.status.default, "draft");
+    assert.equal(properties.completed.default, false);
+    assert.equal(properties.priority.default, 3);
+    assert.deepEqual(properties.metadata.default, { labels: [] });
+    assert.equal(openapi.components.schemas["defaulted-tasks"].required.includes("status"), false);
+  });
+});
+
 test("updates and removes a dynamic entity through the same REST CRUD", async () => {
   await withApi(async (baseUrl) => {
     const created = await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "notes", definition: "type Note = { body: string }" }) });

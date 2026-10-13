@@ -16,9 +16,14 @@ export function parseEntitySource(source: string): { typeName: string; fields: R
     const ui = parseUi(fieldComment);
     const scalar = ["string", "number", "boolean", "json"].includes(type);
     if (!scalar && !ui?.relation) throw new ValidationError(`Reference field ${name} needs @exensial.relation`);
+    const fieldType = scalar ? type as ScalarType : "string";
+    const defaultValue = parseDefault(fieldComment);
+    if (defaultValue.specified && !hasExpectedType(defaultValue.value, fieldType)) throw new ValidationError(`Default value for field "${name}" must be ${fieldType}.`);
     fields[name] = {
-      type: scalar ? type as ScalarType : "string",
-      required: !optional,
+      type: fieldType,
+      // A server-side default makes the input optional even when the type property is not marked `?`.
+      required: !optional && !defaultValue.specified,
+      ...(defaultValue.specified ? { default: defaultValue.value } : {}),
       documentation: parseDocumentation(fieldComment),
       ui
     };
@@ -38,7 +43,12 @@ export function validateRecord(
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new ValidationError("Expected a JSON object");
   }
-  const record = payload as Record<string, unknown>;
+  const record = { ...(payload as Record<string, unknown>) };
+  if (!partial) {
+    for (const [name, field] of Object.entries(fields)) {
+      if (!(name in record) && "default" in field) record[name] = structuredClone(field.default);
+    }
+  }
   for (const [name, value] of Object.entries(record)) {
     const field = fields[name];
     if (!field) throw new ValidationError(`Unknown field "${name}".`);
@@ -102,6 +112,17 @@ function parseUi(comment?: string): FieldUi | undefined {
     ui.relation = second ? { namespace: first, entity: second, ...(label ? { label } : {}) } : { entity: first, ...(label ? { label } : {}) };
   }
   return Object.keys(ui).length ? ui : undefined;
+}
+
+/** Parses a JSON literal from `@exensial.default`, preserving OpenAPI-compatible values. */
+function parseDefault(comment?: string): { specified: boolean; value?: unknown } {
+  if (!comment) return { specified: false };
+  const line = comment.split("\n").map((item) => item.replace(/^\s*\*?\s*/, "").trim()).find((item) => /^@exensial\.default(?:\s|$)/.test(item));
+  if (!line) return { specified: false };
+  const source = line.replace(/^@exensial\.default\s*/, "");
+  if (!source) throw new ValidationError("@exensial.default requires a JSON value");
+  try { return { specified: true, value: JSON.parse(source) }; }
+  catch { throw new ValidationError("@exensial.default must contain a valid JSON value"); }
 }
 
 export class ValidationError extends Error {}

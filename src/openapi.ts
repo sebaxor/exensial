@@ -115,6 +115,7 @@ function fieldSchema(field: FieldDefinition, language: string, localizations: Lo
     ...uiFormat(field.ui?.control),
     title: localizedValue(localizations, language, `${key}.title`, field.documentation?.title),
     description: localizedValue(localizations, language, `${key}.description`, field.documentation?.description),
+    ...("default" in field ? { default: field.default } : {}),
     "x-exensial-localized": field.documentation,
     "x-exensial-ui": field.ui
   };

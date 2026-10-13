@@ -28,6 +28,8 @@ export interface FieldUi {
 export interface FieldDefinition {
   type: ScalarType;
   required: boolean;
+  /** JSON-compatible value applied when this field is omitted on creation. */
+  default?: unknown;
   documentation?: Documentation;
   ui?: FieldUi;
 }
