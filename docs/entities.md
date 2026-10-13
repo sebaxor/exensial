@@ -36,7 +36,7 @@ POST /v1/entities
 {
   "name": "books",
   "namespace": "library",
-  "definition": "type Book = { title: string; author: string; isbn: string; available: boolean }"
+  "definition": "type Book = { title: string; author: string; isbn: string; copiesTotal: number; copiesAvailable?: number }"
 }
 ```
 
@@ -48,7 +48,7 @@ POST /v1/library/books
   "title": "The Left Hand of Darkness",
   "author": "Ursula K. Le Guin",
   "isbn": "978-0441478125",
-  "available": true
+  "copiesTotal": 2
 }
 ```
 
@@ -57,14 +57,14 @@ The response includes the generated `id`. Store that id when creating a related 
 ```json
 POST /v1/library/loans
 {
-  "bookId": "<book-id>",
-  "memberId": "<member-id>",
+  "book": "<book-id>",
+  "member": "<member-id>",
   "borrowedAt": "2026-10-12T10:00:00.000Z",
   "dueAt": "2026-10-26T10:00:00.000Z"
 }
 ```
 
-By default, `bookId` and `memberId` are regular strings. Add a runtime `logic` definition when the entity must look up related records, enforce business criteria, or update another entity as part of the operation.
+The relation values are generated ids, but the names remain domain-oriented. Add a runtime `logic` definition or `code` module when the entity must look up related records, enforce business criteria, or update another entity as part of the operation.
 
 ## Localized documentation
 
@@ -96,9 +96,9 @@ Field JSDoc can also declare presentation hints. Exensial exports them under the
 ```ts
 type Loan = {
   /** @exensial.relation library/books label=title */
-  bookId: string;
+  book: Book;
   /** @exensial.relation library/members label=name */
-  memberId: string;
+  member: Member;
   /** @exensial.ui.control datetime */
   borrowedAt: string;
   /** @exensial.ui.hidden */

@@ -1,30 +1,40 @@
-# Library circulation runtime lab
+# Library circulation lab
 
-This is an independent runtime application: `library/books` owns catalog copies, `library/members` owns membership, and `library/loans` owns circulation. Exensial provides generic CRUD and a neutral collection facade; every rule about copies, members, and loans is installed as library code through `POST /v1/entities`.
+This lab is a complete small application installed through Exensial's REST port. It creates three `library` entities and their domain modules at runtime:
 
-## Data definitions
+- `books` owns bibliographic data and copy availability.
+- `members` owns normalized, active library members.
+- `loans` owns borrowing and return transitions.
+
+The executable source of truth is [install-library-lab.ts](../../scripts/install-library-lab.ts). It sends the type definitions, runtime domain code, Spanish localizations, and fixtures through the public API; no library behavior is compiled into Exensial itself.
+
+## Runtime data model
 
 ```ts
 type Book = {
-  /** @exensial.title en Title
-   * @exensial.ui.searchable */
+  /** @exensial.ui.searchable */
   title: string;
-  /** @exensial.ui.searchable */ author: string;
-  /** @exensial.ui.searchable */ isbn: string;
+  /** @exensial.ui.searchable */
+  author: string;
+  /** @exensial.ui.searchable */
+  isbn: string;
   /** @exensial.ui.control number */
   copiesTotal: number;
-  /** @exensial.title en Available copies */
   /** @exensial.ui.control number */
   copiesAvailable?: number;
 }
+
 type Member = {
   /** @exensial.ui.searchable */
   name: string;
-  /** @exensial.ui.control email
-   * @exensial.ui.searchable */
+  /**
+   * @exensial.ui.control email
+   * @exensial.ui.searchable
+   */
   email: string;
   active?: boolean;
 }
+
 type Loan = {
   /** @exensial.relation library/books label=title */
   book: Book;
@@ -41,69 +51,58 @@ type Loan = {
 }
 ```
 
-## Circulation policy
+`book` and `member` are relation fields. The submitted value is the generated surrogate id, but the entity definition remains domain-oriented and the Console displays the book title and member name rather than those ids.
 
-The book module trims bibliographic data, initializes availability, and prevents a total below borrowed copies. The member module normalizes identity data and activates new members. Both explicitly implement `create`, `bulkCreate`, and `update`, because import is a business operation.
+## Business behavior
 
-The loan module speaks library language. `collection` is only the persistence-neutral boundary; it can later become a table repository and transaction without changing this policy.
+The installed TypeScript modules deliberately contain only library rules:
 
-```ts
-const isDate = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
+- Books trim title, author, and ISBN; ISBN is uppercased. `copiesTotal` must be a positive integer. A new book starts with all copies available, and a total can never fall below copies currently borrowed.
+- Members trim names, lowercase email addresses, require a valid email, and become active on creation.
+- A loan requires a real active member, an available book, and a due date later than its borrow date. Creating it decrements `copiesAvailable`, forces `status` to `active`, and removes any caller-supplied `returnedAt`. If persistence fails, it restores the reserved copy.
+- A return is the only allowed update for an active loan: it must set `status: "returned"` and a valid `returnedAt`; it then releases one copy. Active loans cannot be deleted, and bulk loan creation is rejected.
 
-export default {
-  create: async (context, next) => {
-    const loan = context.input;
-    const books = context.collection("books", "library");
-    const members = context.collection("members", "library");
-    const member = members.get(String(loan.memberId));
-    const book = books.get(String(loan.bookId));
-    if (!member?.active) context.fail("Member is not active");
-    if (!book || Number(book.copiesAvailable) < 1) context.fail("Book is not available");
-    if (!isDate(loan.borrowedAt) || !isDate(loan.dueAt) || Date.parse(loan.dueAt) <= Date.parse(loan.borrowedAt)) context.fail("A later valid dueAt is required");
+The relation and copy operations use `context.collection("books", "library")` and `context.collection("members", "library")`, not HTTP or an in-memory repository. The same domain source can therefore survive a later table repository and transaction implementation.
 
-    await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) - 1 });
-    delete loan.returnedAt;
-    try { loan.status = "active"; await next(); }
-    catch (error) { await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) }); throw error; }
-  },
-  update: async (context, next) => {
-    const loan = context.current;
-    const change = context.input;
-    if (loan.status !== "active" || change.status !== "returned" || !isDate(change.returnedAt)) context.fail("Only an active loan with returnedAt may be returned");
-    await next();
-    const books = context.collection("books", "library");
-    const book = books.get(String(loan.bookId));
-    await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) + 1 });
-  },
-  delete: async (context, next) => { if (context.current.status === "active") context.fail("Active loans cannot be deleted"); await next(); },
-  bulkCreate: async (context) => context.fail("Bulk loans are not allowed")
-};
-```
+## Install
 
-## Expected behavior
-
-- A new book begins with all copies available.
-- A loan requires an active member, an available book, and a valid future due date.
-- Creating a loan reserves one copy, always starts it as `active`, and discards a caller-supplied `returnedAt`; a failed create restores the copy.
-- Returning an active loan releases one copy; active loans cannot be deleted.
-
-## Install and reset the lab
-
-The complete executable definition —schemas, JSDoc metadata, TypeScript domain modules, runtime Spanish labels, and fixture data— lives in [install-library-lab.ts](../../scripts/install-library-lab.ts). It resets only the library entities and their `entity.library.*` localization records, then recreates them through the public REST endpoint.
+Start Exensial, then choose one of the two independent modes:
 
 ```bash
 npm start
+
+# Library data and domain rules; no library permission policy is installed.
 npm run lab:library
+
+# Same domain plus users, roles, JWT permissions, and localized Console labels.
+npm run lab:library:permissions
 ```
 
-For the same domain with a public book catalog and JWT-protected administration, run `npm run lab:library:permissions`. The users, roles, permission rules, credentials, and policy behavior are documented in [Authentication and endpoint permissions](../security.md).
+Both commands reset the three library definitions, their localized labels, and their fixture records. The protected command additionally resets and recreates the lab's `roles`, `users`, and `permissions`; it first signs in as the existing admin when reinstalling an already protected instance.
 
-Pass another local or remote base URL when needed:
+Pass another service URL to the executable script when needed:
 
 ```bash
 npx tsx scripts/install-library-lab.ts http://localhost:3000
+npx tsx scripts/install-library-lab.ts --permissions http://localhost:3000
 ```
 
-After installation, use `/console` for the metadata-driven CRUD UI or `/docs` for Swagger. See [runtime TypeScript domain modules](../runtime-code.md) for the runtime `code` contract.
+The installer creates 100 books, 3 members, and 3 loans (two active and one returned). More than 25 books intentionally exercises the paginated advanced relation lookup in the Console.
 
-There are 100 books, so the loan editor demonstrates the advanced relation lookup. Its book search is driven by the optional [ExensialQuery capability](../exensial-query.md), discovered from OpenAPI; it searches the fields marked `@exensial.ui.searchable` rather than loading every book into a select.
+## Protected mode
+
+`npm run lab:library:permissions` creates these local development identities:
+
+| User | Password | Access |
+| --- | --- | --- |
+| `reader` | `reader123` | Every `GET` endpoint. |
+| `admin` | `admin123` | Reads protected data and performs the administrative writes defined by the lab policy. |
+| anonymous | — | Public `GET /v1/library/books` catalog access. |
+
+Use `/console` for the metadata-driven UI or `/docs` for Swagger. The Console exposes a visible **Sign in** dialog, displays the active username and roles, sends the issued JWT as a Bearer token, and hides resources or CRUD controls that the active principal cannot use. Full policy, JWT, sensitive-field, and OpenAPI metadata details are in [Authentication and endpoint permissions](../security.md).
+
+## Related capabilities
+
+- [Runtime TypeScript domain modules](../runtime-code.md) defines the `context`, `next`, and persistence-neutral collection contract used by this lab.
+- [ExensialQuery](../exensial-query.md) documents the optional read capability used by the advanced book lookup.
+- [Runtime localization](../localization.md) describes the Spanish labels installed by the script.

@@ -6,7 +6,7 @@ The layer installs three ordinary System entities, so they are available through
 
 - `roles` — named groups such as `library-admin`.
 - `users` — a username, an `active` flag, a JSON list of role names, and a hidden password hash.
-- `permissions` — `{ role, method, path, effect }`. `effect` is `allow` or `deny`; a trailing `*` in `path` matches a prefix and an applicable deny wins.
+- `permissions` — `{ role, method, path, effect }`. `effect` is `allow` or `deny`; a trailing `*` in `path` matches a prefix and an applicable deny wins. The reserved role `anonymous` can explicitly allow a public route when a broader role rule also matches it.
 
 `POST /v1/auth/login` accepts `{ "username", "password" }` and produces an HS256 Bearer JWT valid for eight hours. Set `EXENSIAL_JWT_SECRET` outside development. The local JWT adapter is intentionally narrow; an OIDC, session-cookie, or gateway adapter only needs to populate the same principal (`id`, `username`, and `roles`) before the authorization middleware.
 
@@ -17,7 +17,7 @@ The layer installs three ordinary System entities, so they are available through
 3. If rules exist, a missing or invalid Bearer token returns `401` with `WWW-Authenticate: Bearer`.
 4. A signed-in user whose roles do not match an allow returns `403`. A matching deny also returns `403`.
 
-For example, leave `GET /v1/library/books` without a permission for a public catalog, and add an admin allow for `POST /v1/library/books*` to restrict catalog changes.
+For example, the lab explicitly allows `anonymous` to `GET /v1/library/books*`, allows `library-reader` to `GET /v1/*`, and adds administrative write rules separately. This keeps the catalog public without accidentally making every route matched by the broad reader rule require a token.
 
 ## Library lab with permissions
 
@@ -50,7 +50,7 @@ The generated OpenAPI document exposes the login endpoint and Bearer scheme. Ind
 
 ## OpenAPI and Console metadata
 
-The standard OpenAPI `security: [{ bearerAuth: [] }]` property appears only on operations that currently match at least one permission. Exensial also adds the non-standard, UI-oriented `x-exensial-authorization` extension to that operation:
+The standard OpenAPI `security: [{ bearerAuth: [] }]` property appears on operations that currently require a token. Public operations with an explicit `anonymous` allow remain standard-public and do not receive that property. Exensial adds the non-standard, UI-oriented `x-exensial-authorization` extension to every operation with matching policy rules:
 
 ```json
 {

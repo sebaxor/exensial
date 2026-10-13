@@ -22,12 +22,12 @@ The system is intentionally layered. A layer may use the layer below it, but no 
 HTTP adapter
   -> generic REST pattern and CRUD runtime
     -> ordinary repositories
-      -> system entities: requests, responses, entities
+      -> system entities: requests, responses, entities, localizations, users, roles, permissions
         -> runtime-defined entities and their declarative logic or domain code
 ```
 
 - The generic CRUD runtime owns validation, repositories, and the standard REST operations. It has no domain-specific names.
-- `requests` and `responses` are ordinary audit entities using that same runtime.
+- `requests`, `responses`, `localizations`, `users`, `roles`, and `permissions` are ordinary system entities using that same runtime. `passwordHash` is a sensitive field and is redacted at the HTTP representation boundary.
 - `entities` is another ordinary system entity. Its records are entity definitions; its lifecycle installs, replaces, or removes an entity in the runtime. It does not contain book, loan, or application-specific rules.
 - A dynamic entity can include declarative `logic` and/or TypeScript `code`. Both are stored in its `entities` record and installed on top of generic CRUD. The library example is therefore runtime data, not production source code.
 
@@ -39,6 +39,8 @@ The only fixed code above generic CRUD is the reusable interpreter for the suppo
 HTTP request
   -> HTTP adapter
   -> documentation middleware
+  -> authentication endpoint / Bearer-token capture
+  -> authorization middleware
   -> REST pattern middleware
   -> response repository middleware
   -> payload pattern middleware
@@ -85,7 +87,7 @@ The parser deliberately accepts a narrow, declarative subset: fields of type `st
 ## Technical decisions and current limits
 
 - Node HTTP keeps the transport boundary explicit and the dependency set minimal.
-- TypeScript executes through `tsx`, while `tsc --noEmit` remains the static type check.
+- Submitted runtime code is transpiled by the TypeScript compiler and evaluated through Node's `vm` API with an explicit, minimal context; `tsx` runs the service and tests, while `tsc --noEmit` remains the static type check.
 - Repositories, operation middleware, and HTTP adapters are independent seams for future persistence and transports.
 - Runtime definitions and their data are in memory; restarting the process clears both.
 - The optional security layer adds local JWT authentication and role-based endpoint permissions before the CRUD pipeline; it can be disabled with `EXENSIAL_ENABLE_SECURITY=false`. Identity providers, migrations, typed arrays, dates, and richer constraints remain extension points. Collection pagination is supported through `page` and `perPage` query parameters plus response headers.

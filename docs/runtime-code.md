@@ -56,9 +56,8 @@ This module is domain code, not an HTTP handler. It reserves a copy before gener
 export default {
   create: async (context, next) => {
     const loan = context.input as Record<string, unknown>;
-    loan.memberId = String(loan.memberId).trim().toLowerCase();
     const books = context.collection("books", "library");
-    const book = books.get(String(loan.bookId));
+    const book = books.get(String(loan.book));
     if (!book || Number(book.copiesAvailable) < 1) context.fail("Book is not available");
 
     await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) - 1 });
@@ -71,7 +70,7 @@ export default {
     if (context.current?.status !== "active" || change.status !== "returned") context.fail("Only active loans may be returned");
     await next();
     const books = context.collection("books", "library");
-    const book = books.get(String(context.current?.bookId))!;
+    const book = books.get(String(context.current?.book))!;
     await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) + 1 });
   }
 };
