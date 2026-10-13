@@ -3,7 +3,7 @@ import { hashPassword } from "../src/application/security";
 const withPermissions = process.argv.includes("--permissions");
 const baseUrl = process.argv.find((argument) => argument.startsWith("http")) ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
 let accessToken: string | undefined;
-const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "group.Library", "group.System"].map((key) => `ui.${key}`));
+const labUiKeys = new Set(["consoleHint", "loading", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "deleteConfirmation", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noEntities", "noMatches", "noSearchFields", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "username", "password", "changePassword", "currentPassword", "newPassword", "updatePassword", "passwordUpdated", "editProfile", "email", "group.Library", "group.System"].map((key) => `ui.${key}`));
 const labEntityLocalizationPrefixes = ["library.", "openapi.exensialQuery.", "entity.library.", "entity.roles.", "entity.users.", "entity.userRoles.", "entity.permissions.", "entity.entities.", "entity.localizations.", "entity.requests.", "entity.responses."];
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
@@ -340,6 +340,7 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.actions", value: "Acciones" },
     { locale: "es", key: "ui.edit", value: "Editar" },
     { locale: "es", key: "ui.delete", value: "Eliminar" },
+    { locale: "es", key: "ui.deleteConfirmation", value: "¿Eliminar este registro?" },
     { locale: "es", key: "ui.previous", value: "Anterior" },
     { locale: "es", key: "ui.next", value: "Siguiente" },
     { locale: "es", key: "ui.page", value: "Página" },
@@ -351,6 +352,7 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.noRecords", value: "Aún no hay registros." },
     { locale: "es", key: "ui.noEntities", value: "No hay entidades instaladas." },
     { locale: "es", key: "ui.noMatches", value: "No hay registros coincidentes." },
+    { locale: "es", key: "ui.noSearchFields", value: "Esta entidad no expone campos que se puedan buscar." },
     { locale: "es", key: "ui.find", value: "Buscar" },
     { locale: "es", key: "ui.noRecordSelected", value: "No se ha seleccionado un registro" },
     { locale: "es", key: "ui.saved", value: "Guardado." },

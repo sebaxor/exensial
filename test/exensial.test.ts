@@ -258,6 +258,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /Filter/);
     assert.match(consolePage, /applyUiStrings/);
     assert.match(consolePage, /x-exensial-ui-localization/);
+    assert.match(consolePage, /deleteConfirmation/);
+    assert.match(consolePage, /confirm\(t\('deleteConfirmation','Delete this record\?'\)\)/);
     assert.match(consolePage, /navigator\.language/);
     assert.match(consolePage, /t\('new','New'\)/);
     assert.match(consolePage, /type="checkbox"/);
