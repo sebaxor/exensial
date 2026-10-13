@@ -17,6 +17,7 @@ const definition = {
     name: { type: "string", required: true, documentation: { title: { en: "Route name" } } },
     definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type" } } },
     namespace: { type: "string", required: false, documentation: { title: { en: "Namespace" } } },
+    group: { type: "string", required: false, documentation: { title: { en: "Console menu group" } } },
     module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" } } },
     behavior: { type: "json", required: false, documentation: { title: { en: "Behavior configuration" } } },
     logic: { type: "json", required: false, documentation: { title: { en: "Declarative business logic" } } },
@@ -38,6 +39,7 @@ function dynamicModule(record: EntityDefinitionRecord, behaviors: EntityBehavior
       documentation: parsed.documentation,
       context: {
         namespace: record.namespace,
+        group: record.group,
         module: record.module,
         behavior: record.behavior,
         logic: record.logic,

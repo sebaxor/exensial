@@ -7,17 +7,20 @@ export function parseEntitySource(source: string): { typeName: string; fields: R
   const [, entityComment, typeName, body] = match;
 
   const fields: Record<string, FieldDefinition> = {};
-  const fieldPattern = /(?:\/\*\*([\s\S]*?)\*\/\s*)?(\w+)(\?)?\s*:\s*(string|number|boolean|json)\s*[;,]?/g;
+  const fieldPattern = /(?:\/\*\*([\s\S]*?)\*\/\s*)?(\w+)(\?)?\s*:\s*(\w+)\s*[;,]?/g;
   let cursor = 0;
   for (const fieldMatch of body.matchAll(fieldPattern)) {
     const [declaration, fieldComment, name, optional, type] = fieldMatch;
     const skipped = body.slice(cursor, fieldMatch.index).trim();
     if (skipped) throw new ValidationError(`Unsupported field declaration: ${skipped}`);
+    const ui = parseUi(fieldComment);
+    const scalar = ["string", "number", "boolean", "json"].includes(type);
+    if (!scalar && !ui?.relation) throw new ValidationError(`Reference field ${name} needs @exensial.relation`);
     fields[name] = {
-      type: type as ScalarType,
+      type: scalar ? type as ScalarType : "string",
       required: !optional,
       documentation: parseDocumentation(fieldComment),
-      ui: parseUi(fieldComment)
+      ui
     };
     cursor = (fieldMatch.index ?? 0) + declaration.length;
   }

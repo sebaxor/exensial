@@ -19,9 +19,9 @@ type Book = {
 type Member = { name: string; /** @exensial.ui.control email */ email: string; active?: boolean }
 type Loan = {
   /** @exensial.relation library/books label=title */
-  bookId: string;
+  book: Book;
   /** @exensial.relation library/members label=name */
-  memberId: string;
+  member: Member;
   /** @exensial.ui.control datetime */
   borrowedAt: string;
   /** @exensial.ui.control datetime */
