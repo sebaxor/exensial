@@ -311,8 +311,9 @@ function errorResponse(error: unknown): DomainResponse {
 function writeHttpResponse(response: ServerResponse, domain: DomainResponse): void {
   for (const [name, value] of Object.entries(domain.headers ?? {})) response.setHeader(name, value);
   if (domain.body === undefined) return sendEmpty(response, domain.status);
-  if (typeof domain.body === "string" && response.getHeader("content-type")?.toString().startsWith("text/")) {
+  if (typeof domain.body === "string") {
     response.statusCode = domain.status;
+    if (!response.hasHeader("content-type")) response.setHeader("content-type", "text/plain; charset=utf-8");
     response.end(domain.body);
     return;
   }

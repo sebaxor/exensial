@@ -246,9 +246,10 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(openapi.paths["/v1/documented-products/{id}"].patch.description, /Updates only the supplied fields/);
     assert.match(await (await fetch(`${baseUrl}/docs`)).text(), /SwaggerUIBundle/);
     const consolePage = await (await fetch(`${baseUrl}/console`)).text();
-    const codeMirror = await fetch(`${baseUrl}/assets/codemirror.js`);
+    const codeMirror = await fetch(`${baseUrl}/assets/codemirror.js?v=2`);
     assert.equal(codeMirror.status, 200);
-    assert.match(await codeMirror.text(), /CodeMirror/);
+    assert.match(codeMirror.headers.get("content-type") ?? "", /^application\/javascript/);
+    assert.match(await codeMirror.text(), /^\/\/ CodeMirror/);
     assert.match(consolePage, /Runtime entity console/);
     assert.match(consolePage, /openapi\.json/);
     assert.match(consolePage, /exensial\.lastConsoleRoute/);
@@ -261,7 +262,7 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /t\('new','New'\)/);
     assert.match(consolePage, /type="checkbox"/);
     assert.match(consolePage, /CodeMirror/);
-    assert.match(consolePage, /codemirror-typescript/);
+    assert.match(consolePage, /codemirror-typescript\.js\?v=2/);
     assert.match(consolePage, /grid-checkbox/);
     assert.match(consolePage, /return value==='true'/);
     assert.match(consolePage, /auth-form/);
