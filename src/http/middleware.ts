@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
 import { compileExensialFilter } from "../application/exensial-query";
+import type { LocalizationEntry } from "../application/localization";
 import type { EntityRecord } from "../domain/entity";
 import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
 import type { DomainResponse } from "../domain/response";
@@ -50,9 +51,12 @@ export function httpAdapterMiddleware(): Middleware {
 /** Serves generated API documentation without coupling the domain runtime to HTTP. */
 export function documentationMiddleware(runtime: EntityRuntime, options: { exensialQuery?: boolean } = {}): Middleware {
   return async (context, next) => {
-    const pathname = new URL(requireHttpInput(context).url, "http://localhost").pathname;
+    const url = new URL(requireHttpInput(context).url, "http://localhost");
+    const pathname = url.pathname;
+    const language = url.searchParams.get("lang") || "en";
+    const localizations = runtime.listRecords("localizations").map(({ locale, key, value }) => ({ locale, key, value })) as LocalizationEntry[];
     if (pathname === "/openapi.json") {
-      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(), options) };
+      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(), { ...options, language, localizations }) };
       return;
     }
     if (pathname === "/docs") {
@@ -275,5 +279,5 @@ function capturePayload(body: unknown): PayloadPattern { return Array.isArray(bo
 class MethodNotAllowedError extends Error { constructor() { super("Method not allowed"); } }
 
 function swaggerHtml(): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Exensial API</title><link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"></head><body><div id="swagger-ui"></div><script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script><script>SwaggerUIBundle({url:'/openapi.json',dom_id:'#swagger-ui'})</script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Exensial API</title><link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"><style>#language-picker{position:fixed;right:22px;top:13px;z-index:10;padding:6px}</style></head><body><select id="language-picker" aria-label="Language"></select><div id="swagger-ui"></div><script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script><script>const current=new URL(location.href).searchParams.get('lang')||localStorage.getItem('exensial.language')||'en';fetch('/openapi.json?lang='+encodeURIComponent(current)).then(r=>r.json()).then(doc=>{const picker=document.getElementById('language-picker');picker.innerHTML=(doc['x-exensial-locales']||['en']).map(locale=>'<option '+(locale===current?'selected':'')+' value="'+locale+'">'+locale+'</option>').join('');picker.onchange=event=>{localStorage.setItem('exensial.language',event.target.value);const url=new URL(location.href);url.searchParams.set('lang',event.target.value);location.href=url};SwaggerUIBundle({spec:doc,dom_id:'#swagger-ui'})})</script></body></html>`;
 }

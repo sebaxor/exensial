@@ -80,6 +80,12 @@ export class EntityRuntime {
     return this.entities.get(entityKey(entityName, namespace))?.repository.count() ?? 0;
   }
 
+  listRecords(entityName: string, namespace?: string): EntityRecord[] {
+    const entity = this.entities.get(entityKey(entityName, namespace));
+    if (!entity) throw new EntityNotFoundError("Entity not found");
+    return entity.repository.query({ take: 100_000 }).items;
+  }
+
   query(entityName: string, predicate: (record: EntityRecord) => boolean, options: { skip: number; take: number }, namespace?: string): { items: EntityRecord[]; total: number } {
     const entity = this.entities.get(entityKey(entityName, namespace));
     if (!entity) throw new EntityNotFoundError("Entity not found");

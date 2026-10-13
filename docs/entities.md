@@ -87,7 +87,7 @@ type Task = {
 }
 ```
 
-OpenAPI uses the English text, when present, in standard `title` and `description` properties. It preserves every locale in `x-exensial-localized`, so a UI can select its own language without parsing the source again.
+OpenAPI uses English by default in standard `title` and `description` properties and preserves every source locale in `x-exensial-localized`. `GET /openapi.json?lang=es` selects a matching JSDoc locale when present. The system `localizations` entity can override those generated labels at runtime; see [runtime localization](localization.md).
 
 ## UI metadata and relations
 

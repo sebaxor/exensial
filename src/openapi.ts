@@ -1,18 +1,26 @@
 import type { EntityDefinition, FieldDefinition, LocalizedText, ScalarType } from "./domain/entity";
+import { localizedValue, type LocalizationEntry } from "./application/localization";
 
 type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
-export function createOpenApi(definitions: EntityDefinition[], capabilities: { exensialQuery?: boolean } = {}): Record<string, unknown> {
-  const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition)]));
+export interface OpenApiOptions { exensialQuery?: boolean; language?: string; localizations?: LocalizationEntry[]; }
+
+export function createOpenApi(definitions: EntityDefinition[], capabilities: OpenApiOptions = {}): Record<string, unknown> {
+  const language = capabilities.language ?? "en";
+  const localizations = capabilities.localizations ?? [];
+  const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
   const paths = Object.assign({}, ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
   return {
     openapi: "3.0.4",
     info: {
-      title: "Exensial API",
+      title: localizedValue(localizations, language, "openapi.info.title") ?? "Exensial API",
       version: "1.0.0",
-      description: entityCatalogGuide()
+      description: localizedValue(localizations, language, "openapi.info.description") ?? entityCatalogGuide()
     },
+    "x-exensial-language": language,
+    "x-exensial-locales": [...new Set(["en", ...localizations.map((entry) => entry.locale)])].sort(),
+    "x-exensial-ui-localization": Object.fromEntries(localizations.filter((entry) => entry.locale === language && entry.key.startsWith("ui.")).map((entry) => [entry.key, entry.value])),
     "x-exensial-capabilities": capabilities.exensialQuery ? {
       query: {
         exensialQuery: {
@@ -52,15 +60,16 @@ function exensialQueryPaths(definition: EntityDefinition): Record<string, unknow
   };
 }
 
-function entitySchema(definition: EntityDefinition): Schema {
+function entitySchema(definition: EntityDefinition, language: string, localizations: LocalizationEntry[]): Schema {
+  const key = `entity.${schemaKey(definition)}`;
   const properties = Object.fromEntries([
     ["id", { type: "string", format: "uuid", readOnly: true }],
-    ...Object.entries(definition.fields).map(([name, field]) => [name, fieldSchema(field)])
+    ...Object.entries(definition.fields).map(([name, field]) => [name, fieldSchema(field, language, localizations, `${key}.field.${name}`)])
   ]);
   return {
     type: "object",
-    title: text(definition.documentation?.title) ?? definition.name,
-    description: text(definition.documentation?.description),
+    title: localizedValue(localizations, language, `${key}.title`, definition.documentation?.title) ?? definition.name,
+    description: localizedValue(localizations, language, `${key}.description`, definition.documentation?.description),
     "x-exensial-localized": definition.documentation,
     "x-exensial-context": definition.context,
     properties,
@@ -68,12 +77,12 @@ function entitySchema(definition: EntityDefinition): Schema {
   };
 }
 
-function fieldSchema(field: FieldDefinition): Schema {
+function fieldSchema(field: FieldDefinition, language: string, localizations: LocalizationEntry[], key: string): Schema {
   return {
     ...scalarSchema(field.type),
     ...uiFormat(field.ui?.control),
-    title: text(field.documentation?.title),
-    description: text(field.documentation?.description),
+    title: localizedValue(localizations, language, `${key}.title`, field.documentation?.title),
+    description: localizedValue(localizations, language, `${key}.description`, field.documentation?.description),
     "x-exensial-localized": field.documentation,
     "x-exensial-ui": field.ui
   };

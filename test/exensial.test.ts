@@ -99,6 +99,9 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(openapi.info.description, /Start here: define a collection/);
     assert.match(openapi.info.description, /This creates a namespaced task collection/);
     assert.equal(openapi.components.schemas.entities.title, "Entity catalog");
+    assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].control, "textarea");
+    assert.equal(openapi.components.schemas.entities.properties.code["x-exensial-ui"].control, "textarea");
+    assert.match(openapi.components.schemas.entities.properties.name.description, /Final route segment/);
     const schema = openapi.components.schemas["documented-products"];
     assert.equal(schema.title, "Products");
     assert.equal(schema["x-exensial-localized"].title.es, "Productos");
@@ -141,6 +144,18 @@ test("advertises and executes the optional ExensialQuery capability", async () =
     assert.equal((await fetch(`${baseUrl}/openapi.json`)).status, 200);
     assert.equal((await fetch(`${baseUrl}/v1/query/exensial/entities`)).status, 404);
   }, { enableExensialQuery: false });
+});
+
+test("applies runtime localizations to generated OpenAPI", async () => {
+  await withApi(async (baseUrl) => {
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "tasks", definition: "/** @exensial.title en Tasks */\ntype Task = { title: string }" }) });
+    const localization = await fetch(`${baseUrl}/v1/localizations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ locale: "es", key: "entity.tasks.title", value: "Tareas" }) });
+    assert.equal(localization.status, 201);
+    const openapi = await (await fetch(`${baseUrl}/openapi.json?lang=es`)).json();
+    assert.equal(openapi["x-exensial-language"], "es");
+    assert.equal(openapi.components.schemas.tasks.title, "Tareas");
+    assert.ok(openapi["x-exensial-locales"].includes("es"));
+  });
 });
 
 test("binds trusted operation middleware to a runtime-defined entity", async () => {

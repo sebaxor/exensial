@@ -60,6 +60,8 @@ Read [the entity authoring guide](docs/entities.md) for type syntax, localized J
 
 Optional technical capabilities are announced dynamically in OpenAPI. The current [ExensialQuery capability](docs/exensial-query.md) provides a safe, OData-like filtered read endpoint for metadata-driven clients.
 
+[Runtime localization](docs/localization.md) is a system entity that can override generated OpenAPI and Console labels per language without redeploying entity code.
+
 For a controlled local environment, [runtime TypeScript domain modules](docs/runtime-code.md) can also be installed through the entity endpoint. They receive a domain-oriented record API rather than HTTP or repository objects.
 
 Runtime domain examples are documented as independent [labs](docs/labs/README.md). Each lab contains compact domain definitions first and reproducible curls in its appendix.

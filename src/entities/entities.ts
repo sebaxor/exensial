@@ -15,14 +15,14 @@ const definition = {
     }
   },
   fields: {
-    name: { type: "string", required: true, documentation: { title: { en: "Route name" } } },
-    definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type" } } },
-    namespace: { type: "string", required: false, documentation: { title: { en: "Namespace" } } },
-    group: { type: "string", required: false, documentation: { title: { en: "Console menu group" } } },
-    module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" } } },
-    behavior: { type: "json", required: false, documentation: { title: { en: "Behavior configuration" } } },
-    logic: { type: "json", required: false, documentation: { title: { en: "Declarative business logic" } } },
-    code: { type: "string", required: false, documentation: { title: { en: "Runtime TypeScript domain module" } } }
+    name: { type: "string", required: true, documentation: { title: { en: "Route name" }, description: { en: "Final route segment. With namespace library, books becomes /v1/library/books." } } },
+    definition: { type: "string", required: true, documentation: { title: { en: "TypeScript type" }, description: { en: "The entity type alias and its Exensial JSDoc metadata." } }, ui: { control: "textarea" } },
+    namespace: { type: "string", required: false, documentation: { title: { en: "Namespace" }, description: { en: "Optional route segment before the route name; it scopes an entity without replacing its name." } } },
+    group: { type: "string", required: false, documentation: { title: { en: "Console menu group" }, description: { en: "Presentation-only group in the generic console; it does not affect the REST route." } } },
+    module: { type: "string", required: false, documentation: { title: { en: "Trusted behavior module" }, description: { en: "Optional server-registered behavior module id." } } },
+    behavior: { type: "json", required: false, documentation: { title: { en: "Behavior configuration" }, description: { en: "JSON configuration consumed by the selected trusted behavior module." } }, ui: { control: "textarea" } },
+    logic: { type: "json", required: false, documentation: { title: { en: "Declarative business logic" }, description: { en: "Optional portable JSON rules run around CRUD operations." } }, ui: { control: "textarea" } },
+    code: { type: "string", required: false, documentation: { title: { en: "Runtime TypeScript domain module" }, description: { en: "Optional high-level domain module. This source is intentionally multi-line." } }, ui: { control: "textarea" } }
   }
 } satisfies EntityModule["definition"];
 
