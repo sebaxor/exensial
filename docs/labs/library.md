@@ -79,23 +79,19 @@ export default {
 - Creating a loan reserves one copy, always starts it as `active`, and discards a caller-supplied `returnedAt`; a failed create restores the copy.
 - Returning an active loan releases one copy; active loans cannot be deleted.
 
-## Appendix: curls
+## Install and reset the lab
 
-The entity endpoint receives the TypeScript module as its JSON `code` string. The local service is already loaded with the complete book, member, and loan modules described above.
+The complete executable definition —schemas, JSDoc metadata, TypeScript domain modules, and fixture data— lives in [install-library-lab.ts](../../scripts/install-library-lab.ts). It resets only `library/books`, `library/members`, and `library/loans`, then recreates them through the public REST endpoint.
 
 ```bash
-curl http://localhost:3000/v1/entities
-curl http://localhost:3000/v1/library/books
-curl http://localhost:3000/v1/library/members
-curl http://localhost:3000/v1/library/loans
-
-curl -X POST http://localhost:3000/v1/library/loans \
-  -H 'content-type: application/json' \
-  -d '{"bookId":"<book-id>","memberId":"<member-id>","borrowedAt":"2026-10-12T10:00:00.000Z","dueAt":"2026-10-26T10:00:00.000Z"}'
-
-curl -X PATCH http://localhost:3000/v1/library/loans/<loan-id> \
-  -H 'content-type: application/json' \
-  -d '{"status":"returned","returnedAt":"2026-10-20T15:30:00.000Z"}'
+npm start
+npm run lab:library
 ```
 
-See [runtime TypeScript domain modules](../runtime-code.md) for the exact `code` installation contract.
+Pass another local or remote base URL when needed:
+
+```bash
+npx tsx scripts/install-library-lab.ts http://localhost:3000
+```
+
+After installation, use `/console` for the metadata-driven CRUD UI or `/docs` for Swagger. See [runtime TypeScript domain modules](../runtime-code.md) for the runtime `code` contract.
