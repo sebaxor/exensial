@@ -18,6 +18,8 @@ export interface FieldUi {
   /** Excluded from HTTP representations while remaining available to trusted server-side logic. */
   sensitive?: boolean;
   control?: UiControl;
+  /** Syntax language for a source editor in metadata-driven clients. */
+  codeLanguage?: string;
   /** Allows text search operators in optional query capabilities. */
   searchable?: boolean;
   /** Allows equality and comparison filters in optional query capabilities. */

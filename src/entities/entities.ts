@@ -24,6 +24,7 @@ type EntityCatalog = {
   /** @exensial.title en TypeScript type
    * @exensial.title es Tipo TypeScript
    * @exensial.ui.control textarea
+   * @exensial.ui.code typescript
    * @exensial.ui.tableHidden */
   definition: string;
   /** @exensial.title en Namespace
@@ -38,6 +39,7 @@ type EntityCatalog = {
   /** @exensial.title en Runtime TypeScript domain module
    * @exensial.title es Módulo de dominio TypeScript
    * @exensial.ui.control textarea
+   * @exensial.ui.code typescript
    * @exensial.ui.tableHidden */
   code?: string;
 }`;

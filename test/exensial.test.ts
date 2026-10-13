@@ -205,6 +205,7 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].control, "textarea");
     assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].tableHidden, true);
     assert.equal(openapi.components.schemas.entities.properties.code["x-exensial-ui"].control, "textarea");
+    assert.equal(openapi.components.schemas.entities.properties.code["x-exensial-ui"].codeLanguage, "typescript");
     assert.equal(openapi.components.schemas.entities.properties.code["x-exensial-ui"].tableHidden, true);
     assert.match(openapi.components.schemas.entities.properties.name.description, /Final route segment/);
     const schema = openapi.components.schemas["documented-products"];
@@ -224,6 +225,9 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(openapi.paths["/v1/documented-products/{id}"].patch.description, /Updates only the supplied fields/);
     assert.match(await (await fetch(`${baseUrl}/docs`)).text(), /SwaggerUIBundle/);
     const consolePage = await (await fetch(`${baseUrl}/console`)).text();
+    const codeMirror = await fetch(`${baseUrl}/assets/codemirror.js`);
+    assert.equal(codeMirror.status, 200);
+    assert.match(await codeMirror.text(), /CodeMirror/);
     assert.match(consolePage, /Runtime entity console/);
     assert.match(consolePage, /openapi\.json/);
     assert.match(consolePage, /exensial\.lastConsoleRoute/);
@@ -235,6 +239,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /navigator\.language/);
     assert.match(consolePage, /t\('new','New'\)/);
     assert.match(consolePage, /type="checkbox"/);
+    assert.match(consolePage, /CodeMirror/);
+    assert.match(consolePage, /codemirror-typescript/);
     assert.match(consolePage, /grid-checkbox/);
     assert.match(consolePage, /return value==='true'/);
     assert.match(consolePage, /auth-form/);

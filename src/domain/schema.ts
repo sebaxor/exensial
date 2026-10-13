@@ -107,6 +107,8 @@ function parseUi(comment?: string): FieldUi | undefined {
     if (!allowed.includes(control as UiControl)) throw new ValidationError(`Unsupported UI control: ${control}`);
     ui.control = control as UiControl;
   }
+  const codeLanguage = lines.map((line) => line.match(/^@exensial\.ui\.code\s+([\w-]+)$/)).find(Boolean)?.[1];
+  if (codeLanguage) ui.codeLanguage = codeLanguage;
   const relation = lines.map((line) => line.match(/^@exensial\.relation\s+([\w.-]+)(?:\/([\w-]+))?(?:\s+label=(\w+))?$/)).find(Boolean);
   if (relation) {
     const [, first, second, label] = relation;

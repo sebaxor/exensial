@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
 import { compileExensialFilter } from "../application/exensial-query";
 import type { LocalizationEntry } from "../application/localization";
@@ -11,6 +13,12 @@ import { consoleHtml } from "../ui/console";
 import { authenticate, authorize, hashPassword, issueToken, readToken, verifyPassword, type SecurityPrincipal, UnauthorizedError, ForbiddenError } from "../application/security";
 
 type HttpInput = { method: string; url: string; body?: string };
+const require = createRequire(import.meta.url);
+const consoleAssets: Record<string, { path: string; contentType: string }> = {
+  "/assets/codemirror.css": { path: require.resolve("codemirror/lib/codemirror.css"), contentType: "text/css; charset=utf-8" },
+  "/assets/codemirror.js": { path: require.resolve("codemirror/lib/codemirror.js"), contentType: "application/javascript; charset=utf-8" },
+  "/assets/codemirror-typescript.js": { path: require.resolve("codemirror/mode/javascript/javascript.js"), contentType: "application/javascript; charset=utf-8" }
+};
 export type RequestContext = {
   request: IncomingMessage;
   response: ServerResponse;
@@ -68,6 +76,11 @@ export function documentationMiddleware(runtime: EntityRuntime, options: { exens
     }
     if (pathname === "/console") {
       context.domainResponse = { status: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: consoleHtml() };
+      return;
+    }
+    const asset = consoleAssets[pathname];
+    if (asset) {
+      context.domainResponse = { status: 200, headers: { "content-type": asset.contentType, "cache-control": "public, max-age=3600" }, body: await readFile(asset.path, "utf8") };
       return;
     }
     await next();

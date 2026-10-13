@@ -149,9 +149,20 @@ type Loan = {
 }
 ```
 
+For source fields, pair the textarea control with a language hint. This keeps the definition transport-neutral and lets generic clients choose an editor:
+
+```ts
+/**
+ * @exensial.ui.control textarea
+ * @exensial.ui.code typescript
+ */
+code?: string;
+```
+
 - `@exensial.ui.hidden` hides a field from generic consoles and tables. The record still contains it and the REST API remains unchanged.
 - `@exensial.ui.tableHidden` keeps a field out of collection tables while retaining it in the generic create/edit form and REST representation. Use it for large source or configuration fields such as an entity definition.
 - `@exensial.ui.control text|textarea|email|date|datetime|number|money|checkbox` selects a suitable editor. `email`, `date`, and `datetime` also use the standard OpenAPI `format` where applicable.
+- `@exensial.ui.code <language>` identifies a source field for a metadata-driven code editor. The bundled Console currently recognizes `typescript`; Exensial exports the hint as `x-exensial-ui.codeLanguage`, while consumers that do not provide a code editor can keep using a regular textarea.
 - `@exensial.relation <entity>` or `@exensial.relation <namespace>/<entity> label=<field>` declares a record relationship. The generic console reads the target collection and renders a selector using `label`, then `name`, `title`, `email`, or `id`.
 
 The entity catalog also accepts an optional `icon` property. It is a comma-separated fallback list such as `"book,📚"`; Console clients may choose the first icon they support and safely ignore it otherwise.
