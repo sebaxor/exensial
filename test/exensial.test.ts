@@ -71,6 +71,7 @@ test("enforces endpoint permissions while leaving unconfigured endpoints anonymo
     const login = await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: "secret" }) });
     assert.equal(login.status, 200);
     const { accessToken } = await login.json() as { accessToken: string };
+    assert.equal((await fetch(`${baseUrl}/v1/library/books`, { headers: { authorization: `Bearer ${accessToken}` } })).status, 200);
     assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: { ...json, authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ title: "Allowed" }) })).status, 201);
     const users = await (await fetch(`${baseUrl}/v1/users`, { headers: { authorization: `Bearer ${accessToken}` } })).json() as Array<Record<string, unknown>>;
     assert.equal("passwordHash" in users[0], false);

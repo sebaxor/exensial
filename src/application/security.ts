@@ -62,7 +62,9 @@ export function readToken(value: string | undefined, secret: string): SecurityPr
 export function authorize(runtime: EntityRuntime, principal: SecurityPrincipal | undefined, method: string, path: string): void {
   const matches = runtime.listRecords("permissions").filter((permission) => (String(permission.method) === "*" || String(permission.method).toUpperCase() === method.toUpperCase()) && pathMatches(String(permission.path), path));
   if (!matches.length) return; // Unconfigured endpoints remain anonymous by design.
-  if (!principal && matches.some((permission) => roleName(runtime, permission.role) === "anonymous" && permission.effect === "allow")) return;
+  // A public endpoint stays public when a client happens to send a valid token.
+  // Authentication must add capabilities, never remove anonymous read access.
+  if (matches.some((permission) => roleName(runtime, permission.role) === "anonymous" && permission.effect === "allow")) return;
   if (!principal) throw new UnauthorizedError("Authentication is required for this endpoint");
   const roleMatches = matches.filter((permission) => principal.roles.includes(roleName(runtime, permission.role)));
   if (roleMatches.some((permission) => permission.effect === "deny")) throw new ForbiddenError("Your roles are denied access to this endpoint");
