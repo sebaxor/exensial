@@ -5,10 +5,13 @@ Security is an optional infrastructure layer (`EXENSIAL_ENABLE_SECURITY=false` d
 The layer installs three ordinary System entities, so they are available through the same repository and REST conventions as every other entity:
 
 - `roles` — named groups such as `library-admin`.
-- `users` — a username, an `active` flag, a JSON list of role names, and a hidden password hash.
+- `users` — a username, optional email, an `active` flag, a password input that is hashed before persistence, and a hidden password hash. `POST /v1/users` accepts `password` (at least eight characters) for initial setup; the hash is never returned.
+- `userRoles` — the visible many-to-many relation between users and roles. Its `user` and `role` fields are normal Exensial relations, so the generic Console uses a select or advanced lookup automatically.
 - `permissions` — `{ role, method, path, effect }`. `effect` is `allow` or `deny`; a trailing `*` in `path` matches a prefix and an applicable deny wins. The reserved role `anonymous` can explicitly allow a public route when a broader role rule also matches it.
 
 `POST /v1/auth/login` accepts `{ "username", "password" }` and produces an HS256 Bearer JWT valid for eight hours. Set `EXENSIAL_JWT_SECRET` outside development. The local JWT adapter is intentionally narrow; an OIDC, session-cookie, or gateway adapter only needs to populate the same principal (`id`, `username`, and `roles`) before the authorization middleware.
+
+An authenticated user changes their own password with `POST /v1/auth/change-password` and `{ "currentPassword", "newPassword" }`. The Console exposes this action from the identity card at the bottom of the navigation bar.
 
 ## Policy evaluation
 

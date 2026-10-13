@@ -112,6 +112,8 @@ type Loan = {
 - `@exensial.ui.control text|textarea|email|date|datetime|number|money|checkbox` selects a suitable editor. `email`, `date`, and `datetime` also use the standard OpenAPI `format` where applicable.
 - `@exensial.relation <entity>` or `@exensial.relation <namespace>/<entity> label=<field>` declares a record relationship. The generic console reads the target collection and renders a selector using `label`, then `name`, `title`, `email`, or `id`.
 
+The entity catalog also accepts an optional `icon` property. It is a comma-separated fallback list such as `"book,📚"`; Console clients may choose the first icon they support and safely ignore it otherwise.
+
 The generated `id` is hidden by default in the Exensial console but is retained internally for item routes and relationship values.
 
 ## Runtime business logic

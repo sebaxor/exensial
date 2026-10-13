@@ -4,6 +4,7 @@ const withPermissions = process.argv.includes("--permissions");
 const baseUrl = process.argv.find((argument) => argument.startsWith("http")) ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
 let accessToken: string | undefined;
 const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "group.Library", "group.System"].map((key) => `ui.${key}`));
+const labEntityLocalizationPrefixes = ["entity.library.", "entity.roles.", "entity.users.", "entity.userRoles.", "entity.permissions.", "entity.entities.", "entity.localizations.", "entity.requests.", "entity.responses."];
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -67,6 +68,10 @@ type Member = {
    * @exensial.ui.control email
    * @exensial.ui.searchable */
   email: string;
+  /** @exensial.title en User account
+   * @exensial.title es Cuenta de usuario
+   * @exensial.relation users label=username */
+  user?: User;
   /** @exensial.title en Active
    * @exensial.title es Activo */
   active?: boolean;
@@ -176,7 +181,7 @@ export default {
 async function resetLibrary(): Promise<void> {
   await signInIfPresent();
   if (withPermissions) {
-    for (const entity of ["permissions", "users", "roles"]) {
+    for (const entity of ["permissions", "userRoles", "users", "roles"]) {
       const records = await request("GET", `/v1/${entity}`) as Array<{ id: string }>;
       for (const record of records) await request("DELETE", `/v1/${entity}/${record.id}`);
     }
@@ -187,33 +192,48 @@ async function resetLibrary(): Promise<void> {
     await request("DELETE", `/v1/entities/${entity.id}`);
   }
   const localizations = await request("GET", "/v1/localizations") as Array<{ id: string; key: string; locale: string }>;
-  for (const entry of localizations.filter((item) => item.key.startsWith("entity.library.") || (item.locale === "es" && labUiKeys.has(item.key)))) await request("DELETE", `/v1/localizations/${entry.id}`);
+  for (const entry of localizations.filter((item) => labEntityLocalizationPrefixes.some((prefix) => item.key.startsWith(prefix)) || (item.locale === "es" && labUiKeys.has(item.key)))) await request("DELETE", `/v1/localizations/${entry.id}`);
 }
 
 async function installPermissions(): Promise<void> {
-  await request("POST", "/v1/roles", [
+  const roles = (await request("POST", "/v1/roles", [
+    { name: "anonymous", description: "Public access without an authenticated user." },
     { name: "library-reader", description: "Reads the public book catalog." },
     { name: "library-admin", description: "Administers the library and Exensial system catalogs." }
+  ])).items;
+  const roleId = Object.fromEntries(roles.map((role: { id: string; name: string }) => [role.name, role.id]));
+  const users = (await request("POST", "/v1/users", [
+    { username: "reader", email: "reader@library.local", passwordHash: hashPassword("reader123"), roles: [], active: true },
+    { username: "admin", email: "admin@library.local", passwordHash: hashPassword("admin123"), roles: [], active: true },
+    { username: "ana", email: "ana.torres@example.com", passwordHash: hashPassword("member123"), roles: [], active: true },
+    { username: "mateo", email: "mateo.rios@example.com", passwordHash: hashPassword("member123"), roles: [], active: true },
+    { username: "sofia", email: "sofia.perez@example.com", passwordHash: hashPassword("member123"), roles: [], active: true }
+  ])).items;
+  const userId = Object.fromEntries(users.map((user: { id: string; username: string }) => [user.username, user.id]));
+  await request("POST", "/v1/userRoles", [
+    { user: userId.reader, role: roleId["library-reader"] },
+    { user: userId.admin, role: roleId["library-admin"] }
   ]);
-  await request("POST", "/v1/users", [
-    { username: "reader", passwordHash: hashPassword("reader123"), roles: ["library-reader"], active: true },
-    { username: "admin", passwordHash: hashPassword("admin123"), roles: ["library-admin"], active: true }
-  ]);
-  const protectedPaths = ["/v1/library/members*", "/v1/library/loans*", "/v1/entities*", "/v1/localizations*", "/v1/requests*", "/v1/responses*", "/v1/roles*", "/v1/users*", "/v1/permissions*"];
+  const members = await request("GET", "/v1/library/members") as Array<{ id: string; email: string }>;
+  for (const member of members) {
+    const username = member.email.split(".")[0];
+    if (userId[username]) await request("PATCH", `/v1/library/members/${member.id}`, { user: userId[username] });
+  }
+  const protectedPaths = ["/v1/library/members*", "/v1/library/loans*", "/v1/entities*", "/v1/localizations*", "/v1/requests*", "/v1/responses*", "/v1/roles*", "/v1/users*", "/v1/userRoles*", "/v1/permissions*"];
   const permissions = [
-    { role: "anonymous", method: "GET", path: "/v1/library/books*", effect: "allow" },
-    { role: "library-reader", method: "GET", path: "/v1/*", effect: "allow" },
-    ...["POST", "PUT", "PATCH", "DELETE"].map((method) => ({ role: "library-admin", method, path: "/v1/library/books*", effect: "allow" })),
-    ...protectedPaths.map((path) => ({ role: "library-admin", method: "*", path, effect: "allow" }))
+    { role: roleId.anonymous, method: "GET", path: "/v1/library/books*", effect: "allow" },
+    { role: roleId["library-reader"], method: "GET", path: "/v1/*", effect: "allow" },
+    ...["POST", "PUT", "PATCH", "DELETE"].map((method) => ({ role: roleId["library-admin"], method, path: "/v1/library/books*", effect: "allow" })),
+    ...protectedPaths.map((path) => ({ role: roleId["library-admin"], method: "*", path, effect: "allow" }))
   ];
   await request("POST", "/v1/permissions", permissions);
 }
 
 async function install(): Promise<void> {
   await resetLibrary();
-  await request("POST", "/v1/entities", { name: "books", version: "1.0.0", namespace: "library", group: "Library", definition: booksDefinition, code: booksCode });
-  await request("POST", "/v1/entities", { name: "members", version: "1.0.0", namespace: "library", group: "Library", definition: membersDefinition, code: membersCode });
-  await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", definition: loansDefinition, code: loansCode });
+  await request("POST", "/v1/entities", { name: "books", version: "1.0.0", namespace: "library", group: "Library", icon: "book,📚", definition: booksDefinition, code: booksCode });
+  await request("POST", "/v1/entities", { name: "members", version: "1.0.0", namespace: "library", group: "Library", icon: "users,👥", definition: membersDefinition, code: membersCode });
+  await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", icon: "calendar,📅", definition: loansDefinition, code: loansCode });
   await request("POST", "/v1/localizations", [
     { locale: "es", key: "ui.consoleHint", value: "Consola de entidades en tiempo de ejecución" },
     { locale: "es", key: "ui.language", value: "Idioma" },
@@ -254,6 +274,37 @@ async function install(): Promise<void> {
     { locale: "es", key: "entity.library.books.field.copiesAvailable.title", value: "Copias disponibles" },
     { locale: "es", key: "entity.library.loans.field.book.title", value: "Libro" },
     { locale: "es", key: "entity.library.loans.field.member.title", value: "Miembro" }
+    ,{ locale: "es", key: "entity.library.books.field.author.title", value: "Autor" }
+    ,{ locale: "es", key: "entity.library.books.field.isbn.title", value: "ISBN" }
+    ,{ locale: "es", key: "entity.library.books.field.copiesTotal.title", value: "Total de copias" }
+    ,{ locale: "es", key: "entity.library.members.field.name.title", value: "Nombre" }
+    ,{ locale: "es", key: "entity.library.members.field.email.title", value: "Correo electrónico" }
+    ,{ locale: "es", key: "entity.library.members.field.user.title", value: "Cuenta de usuario" }
+    ,{ locale: "es", key: "entity.library.members.field.active.title", value: "Activo" }
+    ,{ locale: "es", key: "entity.library.loans.field.borrowedAt.title", value: "Fecha de préstamo" }
+    ,{ locale: "es", key: "entity.library.loans.field.dueAt.title", value: "Fecha límite" }
+    ,{ locale: "es", key: "entity.library.loans.field.returnedAt.title", value: "Fecha de devolución" }
+    ,{ locale: "es", key: "entity.library.loans.field.status.title", value: "Estado" }
+    ,{ locale: "es", key: "entity.roles.title", value: "Roles" }
+    ,{ locale: "es", key: "entity.roles.field.name.title", value: "Nombre del rol" }
+    ,{ locale: "es", key: "entity.roles.field.description.title", value: "Descripción" }
+    ,{ locale: "es", key: "entity.users.title", value: "Usuarios" }
+    ,{ locale: "es", key: "entity.users.field.username.title", value: "Usuario" }
+    ,{ locale: "es", key: "entity.users.field.email.title", value: "Correo electrónico" }
+    ,{ locale: "es", key: "entity.users.field.password.title", value: "Contraseña inicial" }
+    ,{ locale: "es", key: "entity.users.field.active.title", value: "Activo" }
+    ,{ locale: "es", key: "entity.userRoles.title", value: "Roles de usuario" }
+    ,{ locale: "es", key: "entity.userRoles.field.user.title", value: "Usuario" }
+    ,{ locale: "es", key: "entity.userRoles.field.role.title", value: "Rol" }
+    ,{ locale: "es", key: "entity.permissions.title", value: "Permisos de endpoints" }
+    ,{ locale: "es", key: "entity.permissions.field.role.title", value: "Rol" }
+    ,{ locale: "es", key: "entity.permissions.field.method.title", value: "Método HTTP" }
+    ,{ locale: "es", key: "entity.permissions.field.path.title", value: "Patrón de ruta" }
+    ,{ locale: "es", key: "entity.permissions.field.effect.title", value: "Efecto" }
+    ,{ locale: "es", key: "entity.entities.title", value: "Catálogo de entidades" }
+    ,{ locale: "es", key: "entity.localizations.title", value: "Catálogo de localizaciones" }
+    ,{ locale: "es", key: "entity.requests.title", value: "Registro de solicitudes" }
+    ,{ locale: "es", key: "entity.responses.title", value: "Registro de respuestas" }
   ]);
 
   const featuredBooks = [

@@ -8,7 +8,7 @@ import type { DomainResponse } from "../domain/response";
 import { BadRequestError, parseJson, readBody, sendEmpty, sendJson } from "../http";
 import { createOpenApi } from "../openapi";
 import { consoleHtml } from "../ui/console";
-import { authenticate, authorize, issueToken, readToken, type SecurityPrincipal, UnauthorizedError, ForbiddenError } from "../application/security";
+import { authenticate, authorize, hashPassword, issueToken, readToken, verifyPassword, type SecurityPrincipal, UnauthorizedError, ForbiddenError } from "../application/security";
 
 type HttpInput = { method: string; url: string; body?: string };
 export type RequestContext = {
@@ -88,6 +88,18 @@ export function authenticationMiddleware(runtime: EntityRuntime, enabled = true)
       return;
     }
     context.principal = readToken(context.request.headers.authorization, process.env.EXENSIAL_JWT_SECRET ?? "exensial-development-secret");
+    if (url.pathname === "/v1/auth/change-password") {
+      if (input.method !== "POST") throw new MethodNotAllowedError();
+      if (!context.principal) throw new UnauthorizedError("Authentication is required");
+      const payload = parseJson(input.body ?? "") as Record<string, unknown>;
+      const user = runtime.findRecord("users", context.principal.id);
+      if (!user || !verifyPassword(String(payload.currentPassword ?? ""), user.passwordHash)) throw new UnauthorizedError("Current password is incorrect");
+      const nextPassword = String(payload.newPassword ?? "");
+      if (nextPassword.length < 8) throw new ValidationError("New password must contain at least 8 characters");
+      await runtime.execute({ apiVersion: "v1", entityName: "users", action: "update", id: user.id, payload: { kind: "one", value: { passwordHash: hashPassword(nextPassword) } } });
+      context.domainResponse = { status: 204 };
+      return;
+    }
     await next();
   };
 }

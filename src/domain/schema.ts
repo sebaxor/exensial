@@ -82,7 +82,7 @@ function parseUi(comment?: string): FieldUi | undefined {
   if (lines.some((line) => line === "@exensial.ui.filterable")) ui.filterable = true;
   const control = lines.map((line) => line.match(/^@exensial\.ui\.control\s+(\w+)$/)).find(Boolean)?.[1];
   if (control) {
-    const allowed: UiControl[] = ["text", "textarea", "email", "date", "datetime", "number", "money", "checkbox"];
+    const allowed: UiControl[] = ["text", "textarea", "email", "password", "date", "datetime", "number", "money", "checkbox"];
     if (!allowed.includes(control as UiControl)) throw new ValidationError(`Unsupported UI control: ${control}`);
     ui.control = control as UiControl;
   }

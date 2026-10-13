@@ -7,7 +7,7 @@ export interface Documentation {
   description?: LocalizedText;
 }
 
-export type UiControl = "text" | "textarea" | "email" | "date" | "datetime" | "number" | "money" | "checkbox";
+export type UiControl = "text" | "textarea" | "email" | "password" | "date" | "datetime" | "number" | "money" | "checkbox";
 
 export interface FieldUi {
   hidden?: boolean;
@@ -32,7 +32,7 @@ export interface EntityDefinition {
   name: string;
   fields: Record<string, FieldDefinition>;
   documentation?: Documentation;
-  context?: { namespace?: string; version?: string; group?: string; module?: string; behavior?: Record<string, unknown>; logic?: Record<string, unknown>; code?: string; operations?: string[] };
+  context?: { namespace?: string; version?: string; group?: string; icon?: string; module?: string; behavior?: Record<string, unknown>; logic?: Record<string, unknown>; code?: string; operations?: string[] };
 }
 
 export type EntityRecord = Record<string, unknown> & { id: string };
@@ -43,6 +43,7 @@ export type EntityDefinitionRecord = EntityRecord & {
   namespace?: string;
   version: string;
   group?: string;
+  icon?: string;
   module?: string;
   behavior?: Record<string, unknown>;
   logic?: Record<string, unknown>;
