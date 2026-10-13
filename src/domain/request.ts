@@ -12,4 +12,5 @@ export interface DomainRequest {
   action: CrudAction;
   id?: string;
   payload?: PayloadPattern;
+  pagination?: { page: number; perPage: number };
 }

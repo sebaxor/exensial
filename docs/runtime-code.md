@@ -27,12 +27,14 @@ type BusinessContext = {
   current?: Record<string, unknown> & { id: string };
   result?: Record<string, unknown> | Array<Record<string, unknown>>;
   records: {
+    count(entityName: string, namespace?: string): number;
     get(entityName: string, id: string, namespace?: string): Record<string, unknown> | undefined;
     create(entityName: string, value: Record<string, unknown>, namespace?: string): Promise<Record<string, unknown>>;
     update(entityName: string, id: string, changes: Record<string, unknown>, namespace?: string): Promise<Record<string, unknown>>;
     remove(entityName: string, id: string, namespace?: string): Promise<void>;
   };
   collection(entityName: string, namespace?: string): {
+    count(): number;
     get(id: string): Record<string, unknown> | undefined;
     create(value: Record<string, unknown>): Promise<Record<string, unknown>>;
     update(id: string, changes: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -92,5 +94,7 @@ The entity catalog stores source as the entity's `code` field and compiles it wh
 Today Exensial uses Node's VM API only to load a module without injecting Node globals into its explicit context. That does **not** safely isolate hostile JavaScript. A future production executor must replace this development compiler with a restricted language/AST or an isolated worker sandbox with explicit capability grants.
 
 Today each `records.*` call delegates to the in-memory runtime, so multi-entity changes are not atomic. The important preserved boundary is that domain code calls the `records` facade instead of an `InMemoryRepository`. When repositories become tables, the facade can run inside one database transaction and map entity definitions to tables without changing domain source.
+
+`count()` is available on `records` and on a bound `collection`. Arbitrary query execution is intentionally a TODO: the future API will accept a normalized query object (a string may be its initial transport representation), validate it, and compile it for the configured repository. Submitted query strings are never executed today.
 
 Declarative `logic` remains supported for compact, portable rules. Runtime `code` is the escape hatch for domain workflows that do not yet fit that vocabulary.

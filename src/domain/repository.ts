@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 export interface Repository<T extends { id: string }> {
   create(data: Omit<T, "id">, id?: string): T;
   findAll(): T[];
+  findPage(page: number, perPage: number): T[];
+  count(): number;
   findById(id: string): T | undefined;
   update(id: string, changes: Partial<Omit<T, "id">>): T | undefined;
   delete(id: string): boolean;
@@ -21,6 +23,9 @@ export class InMemoryRepository<T extends { id: string }> implements Repository<
   findAll(): T[] {
     return [...this.items.values()];
   }
+
+  findPage(page: number, perPage: number): T[] { return this.findAll().slice((page - 1) * perPage, page * perPage); }
+  count(): number { return this.items.size; }
 
   findById(id: string): T | undefined {
     return this.items.get(id);

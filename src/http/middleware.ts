@@ -74,7 +74,7 @@ export function restPatternMiddleware(runtime: EntityRuntime): Middleware {
     if (!route) throw new EntityNotFoundError("Route not found");
     const action = actionFor(input.method, route.id);
     if (!action) throw new MethodNotAllowedError();
-    context.domainRequest = { ...route, action };
+    context.domainRequest = { ...route, action, ...(action === "list" ? { pagination: pagination(input.url) } : {}) };
     await next();
   };
 }
@@ -158,12 +158,28 @@ export function entityLifecycleMiddleware(runtime: EntityRuntime): Middleware {
     const result = await runtime.execute(request);
     if (request.action === "delete") return setResponse(context, 204);
     if (request.action === "bulkCreate") return setResponse(context, 201, { items: result });
+    if (request.action === "list") return setResponse(context, 200, result, paginationHeaders(context, runtime, request));
     setResponse(context, request.action === "create" ? 201 : 200, result);
   };
 }
 
-function setResponse(context: RequestContext, status: number, body?: unknown): void {
-  context.domainResponse = { status, body };
+function setResponse(context: RequestContext, status: number, body?: unknown, headers?: Record<string, string>): void {
+  context.domainResponse = { status, body, headers };
+}
+
+function pagination(url: string): { page: number; perPage: number } {
+  const query = new URL(url, "http://localhost").searchParams;
+  const number = (name: string, fallback: number) => { const value = Number(query.get(name) ?? fallback); if (!Number.isInteger(value) || value < 1 || value > 100) throw new ValidationError(`${name} must be an integer between 1 and 100`); return value; };
+  return { page: number("page", 1), perPage: number("perPage", 25) };
+}
+
+function paginationHeaders(context: RequestContext, runtime: EntityRuntime, request: DomainRequest): Record<string, string> {
+  const { page, perPage } = request.pagination!;
+  const total = runtime.count(request.entityName, request.namespace);
+  const url = new URL(requireHttpInput(context).url, "http://localhost");
+  const link = (target: number, rel: string) => { const next = new URL(url); next.searchParams.set("page", String(target)); next.searchParams.set("perPage", String(perPage)); return `<${next.pathname}${next.search}>; rel="${rel}"`; };
+  const links = [page > 1 ? link(1, "first") : "", page > 1 ? link(page - 1, "prev") : "", page * perPage < total ? link(page + 1, "next") : "", total ? link(Math.ceil(total / perPage), "last") : ""].filter(Boolean);
+  return { "X-Total-Count": String(total), "X-Page": String(page), "X-Per-Page": String(perPage), ...(links.length ? { Link: links.join(", ") } : {}) };
 }
 
 function requireHttpInput(context: RequestContext): HttpInput {

@@ -88,4 +88,5 @@ The parser deliberately accepts a narrow, declarative subset: fields of type `st
 - TypeScript executes through `tsx`, while `tsc --noEmit` remains the static type check.
 - Repositories, operation middleware, and HTTP adapters are independent seams for future persistence and transports.
 - Runtime definitions and their data are in memory; restarting the process clears both.
-- Authentication, authorization, pagination, migrations, relations, typed arrays, dates, and richer constraints are intentionally outside this minimal implementation.
+- Authentication, authorization, migrations, typed arrays, dates, and richer constraints are intentionally outside this minimal implementation. Collection pagination is supported through `page` and `perPage` query parameters plus response headers.
+- Arbitrary repository queries are intentionally **not implemented**. The repository boundary will later accept a normalized query object (initially representable as a string at the domain boundary), with validation and backend-specific compilation; runtime code must not execute submitted query text.

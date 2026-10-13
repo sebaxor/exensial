@@ -17,12 +17,14 @@ export interface BusinessContext {
   readonly current?: EntityRecord;
   result?: EntityRecord | EntityRecord[];
   records: {
+    count(entityName: string, namespace?: string): number;
     get(entityName: string, id: string, namespace?: string): EntityRecord | undefined;
     create(entityName: string, value: Record<string, unknown>, namespace?: string): Promise<EntityRecord>;
     update(entityName: string, id: string, changes: Record<string, unknown>, namespace?: string): Promise<EntityRecord>;
     remove(entityName: string, id: string, namespace?: string): Promise<void>;
   };
   collection(entityName: string, namespace?: string): {
+    count(): number;
     get(id: string): EntityRecord | undefined;
     create(value: Record<string, unknown>): Promise<EntityRecord>;
     update(id: string, changes: Record<string, unknown>): Promise<EntityRecord>;
@@ -88,6 +90,7 @@ function businessContext(context: EntityOperationContext): BusinessContext {
   });
 
   const records = {
+    count: (entityName: string, namespace?: string) => context.runtime.count(entityName, namespace),
     get: (entityName: string, id: string, namespace?: string) => context.runtime.findRecord(entityName, id, namespace),
     create: async (entityName: string, value: Record<string, unknown>, namespace?: string) => requiredRecord(await execute("create", entityName, namespace, undefined, value)),
     update: async (entityName: string, id: string, changes: Record<string, unknown>, namespace?: string) => requiredRecord(await execute("update", entityName, namespace, id, changes)),
@@ -101,6 +104,7 @@ function businessContext(context: EntityOperationContext): BusinessContext {
     set result(value) { context.result = value; },
     records,
     collection: (entityName, namespace) => ({
+      count: () => records.count(entityName, namespace),
       get: (id) => records.get(entityName, id, namespace),
       create: (value) => records.create(entityName, value, namespace),
       update: (id, changes) => records.update(entityName, id, changes, namespace),

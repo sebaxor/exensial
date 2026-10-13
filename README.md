@@ -52,6 +52,8 @@ Every recognized request and normalized response are also stored as the system e
 
 The dependency-free runtime console at `/console` reads that same OpenAPI document and generates a navigation menu plus list, create, edit, and delete screens for every active entity.
 
+Collection `GET` is paginated by default: `?page=1&perPage=25` (maximum 100). Responses expose `X-Total-Count`, `X-Page`, `X-Per-Page`, and RFC 8288 `Link` navigation headers. The console remembers its selected page size locally.
+
 The entity catalog is enabled by default. Run `EXENSIAL_ENABLE_ENTITY_CATALOG=false npm start` to expose only application-installed modules and disable `/v1/entities`.
 
 Read [the entity authoring guide](docs/entities.md) for type syntax, localized JSDoc, namespaces, and business behavior. Read [the architecture](docs/architecture.md) for pipeline and design decisions.

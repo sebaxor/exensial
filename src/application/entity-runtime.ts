@@ -76,6 +76,10 @@ export class EntityRuntime {
     return this.entities.get(entityKey(entityName, namespace))?.repository.findById(id);
   }
 
+  count(entityName: string, namespace?: string): number {
+    return this.entities.get(entityKey(entityName, namespace))?.repository.count() ?? 0;
+  }
+
   async execute(request: DomainRequest, options: { createId?: string } = {}): Promise<EntityRecord | EntityRecord[] | undefined> {
     const entity = this.entities.get(entityKey(request.entityName, request.namespace));
     if (!entity) throw new EntityNotFoundError("Entity not found");
@@ -98,7 +102,7 @@ export class EntityRuntime {
 
   private async executeDefault(entity: ActiveEntity, context: EntityOperationContext, options: { createId?: string }): Promise<void> {
     const { action } = context.request;
-    if (action === "list") context.result = entity.repository.findAll();
+    if (action === "list") context.result = entity.repository.findPage(context.request.pagination?.page ?? 1, context.request.pagination?.perPage ?? 25);
     if (action === "get") context.result = context.current;
     if (action === "create") context.result = await this.create(entity, context.input as Record<string, unknown>, options.createId);
     if (action === "bulkCreate") context.result = await this.createMany(entity, context.input as Record<string, unknown>[]);
