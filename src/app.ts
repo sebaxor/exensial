@@ -1,6 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
-import { EntityBehaviorRegistry, type EntityBehaviorModule } from "./application/entity-behaviors";
 import { createEntitiesModule } from "./entities/entities";
 import { transportModules } from "./entities/transport";
 import { securityModules } from "./application/security";
@@ -8,7 +7,6 @@ import { authenticationMiddleware, authorizationMiddleware, compose, documentati
 
 export interface AppOptions {
   modules?: EntityModule[];
-  behaviorModules?: EntityBehaviorModule[];
   enableEntityCatalog?: boolean;
   enableExensialQuery?: boolean;
   enableSecurity?: boolean;
@@ -17,17 +15,14 @@ export interface AppOptions {
 /** Creates the HTTP app with the system entity and any code-defined entity modules. */
 export function createApp({
   modules = [],
-  behaviorModules = [],
   enableEntityCatalog = process.env.EXENSIAL_ENABLE_ENTITY_CATALOG !== "false",
   enableExensialQuery = process.env.EXENSIAL_ENABLE_EXENSIAL_QUERY !== "false",
   enableSecurity = process.env.EXENSIAL_ENABLE_SECURITY !== "false"
 }: AppOptions = {}) {
   const runtime = new EntityRuntime();
-  const behaviors = new EntityBehaviorRegistry();
-  for (const behavior of behaviorModules) behaviors.register(behavior);
   for (const module of transportModules) runtime.installIfMissing(module);
   if (enableSecurity) for (const module of securityModules) runtime.installIfMissing(module);
-  if (enableEntityCatalog) runtime.installIfMissing(createEntitiesModule(runtime, behaviors));
+  if (enableEntityCatalog) runtime.installIfMissing(createEntitiesModule(runtime));
   for (const module of modules) runtime.install(module);
   const handle = compose([
     httpAdapterMiddleware(),

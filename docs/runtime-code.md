@@ -96,4 +96,4 @@ Today each `records.*` call delegates to the in-memory runtime, so multi-entity 
 
 `count()` is available on `records` and on a bound `collection`. Runtime domain code deliberately does not receive arbitrary query execution. Read query engines are HTTP capabilities that validate and compile their syntax at the transport boundary before calling the repository; submitted query text is never executed as code.
 
-Declarative `logic` remains supported for compact, portable rules. Runtime `code` is the escape hatch for domain workflows that do not yet fit that vocabulary.
+Runtime `code` is the single business-behavior mechanism for dynamic entities. This keeps each runtime definition focused on its domain source instead of splitting behavior between multiple DSLs and server-registered modules.

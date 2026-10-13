@@ -362,9 +362,6 @@ async function install(): Promise<void> {
     ,{ locale: "es", key: "entity.entities.field.namespace.title", value: "Espacio de nombres" }
     ,{ locale: "es", key: "entity.entities.field.group.title", value: "Grupo del menú" }
     ,{ locale: "es", key: "entity.entities.field.icon.title", value: "Ícono del menú" }
-    ,{ locale: "es", key: "entity.entities.field.module.title", value: "Módulo de comportamiento confiable" }
-    ,{ locale: "es", key: "entity.entities.field.behavior.title", value: "Configuración de comportamiento" }
-    ,{ locale: "es", key: "entity.entities.field.logic.title", value: "Lógica de negocio declarativa" }
     ,{ locale: "es", key: "entity.entities.field.code.title", value: "Módulo de dominio TypeScript" }
     ,{ locale: "es", key: "entity.localizations.title", value: "Catálogo de localizaciones" }
     ,{ locale: "es", key: "entity.localizations.field.locale.title", value: "Idioma" }

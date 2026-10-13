@@ -64,7 +64,7 @@ POST /v1/library/loans
 }
 ```
 
-The relation values are generated ids, but the names remain domain-oriented. Add a runtime `logic` definition or `code` module when the entity must look up related records, enforce business criteria, or update another entity as part of the operation.
+The relation values are generated ids, but the names remain domain-oriented. Add a runtime `code` module when the entity must look up related records, enforce business criteria, or update another entity as part of the operation.
 
 ## Localized documentation
 
@@ -136,33 +136,9 @@ The entity catalog also accepts an optional `icon` property. It is a comma-separ
 
 The generated `id` is hidden by default in the Exensial console but is retained internally for item routes and relationship values.
 
-## Runtime business logic
-
-`logic` is a high-level, declarative business definition sent to `POST /v1/entities` with the schema. It is installed immediately for that entity. It is not JavaScript and has no HTTP, repository, or middleware details: it describes validations, record lookups, field assignments, and patches to related entities.
-
-Each CRUD action can have three phases:
-
-- `before`: runs before generic CRUD; reject invalid input, look up related records, or set computed fields.
-- `after`: runs only after generic CRUD succeeds; update related entities.
-- `onError`: runs when generic CRUD fails after `before`; useful for compensating a reservation.
-
-The supported rule types are:
-
-- `assert`: validate `nonEmptyString`, `isoDate`, `equals`, or `notEquals`.
-- `assertDateOrder`: require one date field to be later than another.
-- `lookup`: read a record from another entity and bind it under a local name.
-- `set`: assign a value to the current create/update input.
-- `patch`: partially update a referenced entity.
-- `reject`: stop an operation with a business error.
-- `normalize`: trim text and optionally normalize its case.
-- `validate`: apply grouped required, date, and positive-integer checks.
-- `copy`: derive one input field from another.
-
-For a complete runtime example with copies and loans, see the [library circulation lab](labs/library.md). Inventory and loan-state rules belong in that lab's runtime code, not in Exensial's generic rule vocabulary.
-
 ## Runtime TypeScript domain code
 
-When a workflow cannot be expressed by the reusable `logic` vocabulary, the entity request may include a `code` string containing a TypeScript module. It must `export default` an object whose keys are CRUD operations. Each function receives a domain context and `next`, exactly like middleware: mutate `context.input` or check records before `await next()`, then react to completed generic CRUD afterwards.
+The entity request may include a `code` string containing a TypeScript module. It must `export default` an object whose keys are CRUD operations. Each function receives a domain context and `next`, exactly like middleware: mutate `context.input` or check records before `await next()`, then react to completed generic CRUD afterwards.
 
 ```ts
 export default {
@@ -174,49 +150,6 @@ export default {
 ```
 
 The context provides `records.get/create/update/remove` for other entities and `fail(message)` for a business rejection. It does not expose HTTP requests, responses, repositories, filesystem, or database drivers. This keeps domain source independent from the current in-memory repository. Read [runtime TypeScript domain modules](runtime-code.md) for the full contract and development-only security limitation.
-
-The following is a deliberately explicit, low-level example built from `lookup`, `assert`, and `patch`. It remains useful for declarative relationships. Domain workflows such as circulation should use runtime TypeScript code instead.
-
-```json
-{
-  "name": "loans",
-  "namespace": "library",
-  "definition": "type Loan = { bookId: string; memberId: string; borrowedAt: string; dueAt: string; returnedAt?: string; status?: string }",
-  "logic": {
-    "create": {
-      "before": [
-        { "type": "assert", "field": "bookId", "rule": "nonEmptyString" },
-        { "type": "assert", "field": "memberId", "rule": "nonEmptyString" },
-        { "type": "assert", "field": "borrowedAt", "rule": "isoDate" },
-        { "type": "assert", "field": "dueAt", "rule": "isoDate" },
-        { "type": "assertDateOrder", "earlier": "borrowedAt", "later": "dueAt" },
-        { "type": "lookup", "as": "book", "entityName": "books", "namespace": "library", "idField": "bookId" },
-        { "type": "assert", "source": "book", "field": "available", "rule": "equals", "value": true },
-        { "type": "set", "field": "status", "value": "active" },
-        { "type": "patch", "entityName": "books", "namespace": "library", "idField": "bookId", "value": { "available": false } }
-      ],
-      "onError": [
-        { "type": "patch", "entityName": "books", "namespace": "library", "idField": "bookId", "value": { "available": true } }
-      ]
-    },
-    "update": {
-      "before": [
-        { "type": "assert", "field": "status", "rule": "equals", "value": "returned" },
-        { "type": "assert", "source": "current", "field": "status", "rule": "equals", "value": "active" },
-        { "type": "assert", "field": "returnedAt", "rule": "isoDate" },
-        { "type": "lookup", "as": "book", "entityName": "books", "namespace": "library", "idSource": "current", "idField": "bookId" }
-      ],
-      "after": [
-        { "type": "patch", "entityName": "books", "namespace": "library", "idSource": "current", "idField": "bookId", "value": { "available": true } }
-      ]
-    },
-    "bulkCreate": { "before": [{ "type": "reject", "message": "Bulk loans are not allowed" }] },
-    "delete": { "before": [{ "type": "assert", "source": "current", "field": "status", "rule": "notEquals", "value": "active" }] }
-  }
-}
-```
-
-On create, this logic validates the DTO, looks up the book, writes `status: "active"`, and patches a related record. It demonstrates generic composition only; a copy-aware circulation policy belongs in a runtime TypeScript domain module.
 
 ## Disabling the catalog
 

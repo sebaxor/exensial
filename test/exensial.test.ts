@@ -3,7 +3,6 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { createApp } from "../src/app";
 import type { AppOptions } from "../src/app";
-import type { EntityBehaviorModule } from "../src/application/entity-behaviors";
 import { hashPassword } from "../src/application/security";
 
 async function withApi(run: (baseUrl: string) => Promise<void>, options: AppOptions = {}) {
@@ -225,48 +224,6 @@ test("applies runtime localizations to generated OpenAPI", async () => {
   });
 });
 
-test("binds trusted operation middleware to a runtime-defined entity", async () => {
-  const normalizeTitle: EntityBehaviorModule = {
-    id: "example/normalize-title",
-    operations: {
-      create: async (context, next) => {
-        const input = context.input as Record<string, unknown>;
-        input.title = String(input.title).trim().toUpperCase();
-        await next();
-      },
-      list: async (context) => {
-        context.result = [];
-      }
-    }
-  };
-  await withApi(async (baseUrl) => {
-    const entity = await fetch(`${baseUrl}/v1/entities`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: "announcements",
-        namespace: "demo.content",
-        module: "example/normalize-title",
-        definition: "type Announcement = { title: string }"
-      })
-    });
-    assert.equal(entity.status, 201);
-    const created = await fetch(`${baseUrl}/v1/demo.content/announcements`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "  hello  " })
-    });
-    assert.equal((await created.json()).title, "HELLO");
-    assert.deepEqual(await (await fetch(`${baseUrl}/v1/demo.content/announcements`)).json(), []);
-    assert.equal((await fetch(`${baseUrl}/v1/announcements`)).status, 404);
-    const requests = await (await fetch(`${baseUrl}/v1/requests`)).json();
-    assert.ok(requests.some((request: { namespace?: string; entityName: string }) => request.namespace === "demo.content" && request.entityName === "announcements"));
-
-    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
-    assert.deepEqual(openapi.components.schemas["demo.content.announcements"]["x-exensial-context"], {
-      namespace: "demo.content", version: "1.0.0", module: "example/normalize-title", operations: ["create", "list"]
-    });
-    assert.ok(openapi.paths["/v1/demo.content/announcements"]);
-  }, { behaviorModules: [normalizeTitle] });
-});
-
 test("installs a TypeScript domain module received through the entity endpoint", async () => {
   await withApi(async (baseUrl) => {
     const post = (path: string, body: unknown) => fetch(`${baseUrl}${path}`, {
@@ -343,31 +300,6 @@ test("allows equal entity names in separate namespaces", async () => {
     })).status, 201);
     assert.equal((await (await fetch(`${baseUrl}/v1/acme.sales/tickets`)).json()).length, 1);
     assert.equal((await (await fetch(`${baseUrl}/v1/acme.support/tickets`)).json()).length, 1);
-  });
-});
-
-test("applies generic declarative rules without domain-specific inventory behavior", async () => {
-  await withApi(async (baseUrl) => {
-    const post = (path: string, body: unknown) => fetch(`${baseUrl}${path}`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
-    });
-    await post("/v1/entities", {
-      name: "notes",
-      definition: "type Note = { title: string; slug?: string }",
-      logic: {
-        create: { before: [
-          { type: "normalize", fields: ["title"] },
-          { type: "validate", required: ["title"] },
-          { type: "copy", from: "title", to: "slug" }
-        ] }
-      }
-    });
-    const note = await (await post("/v1/notes", { title: "  Runtime rules  " })).json();
-    assert.deepEqual({ title: note.title, slug: note.slug }, { title: "Runtime rules", slug: "Runtime rules" });
-    const imported = await post("/v1/notes", [{ title: "  First  " }, { title: " Second " }]);
-    assert.equal(imported.status, 201);
-    const items = (await imported.json()).items;
-    assert.deepEqual(items.map((item: { title: string; slug: string }) => [item.title, item.slug]), [["First", "First"], ["Second", "Second"]]);
   });
 });
 

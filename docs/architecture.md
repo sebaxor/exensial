@@ -23,15 +23,15 @@ HTTP adapter
   -> generic REST pattern and CRUD runtime
     -> ordinary repositories
       -> system entities: requests, responses, entities, localizations, users, roles, permissions
-        -> runtime-defined entities and their declarative logic or domain code
+        -> runtime-defined entities and their domain code
 ```
 
 - The generic CRUD runtime owns validation, repositories, and the standard REST operations. It has no domain-specific names.
 - `requests`, `responses`, `localizations`, `users`, `roles`, and `permissions` are ordinary system entities using that same runtime. `passwordHash` is a sensitive field and is redacted at the HTTP representation boundary.
 - `entities` is another ordinary system entity. Its records are entity definitions; its lifecycle installs, replaces, or removes an entity in the runtime. It does not contain book, loan, or application-specific rules.
-- A dynamic entity can include declarative `logic` and/or TypeScript `code`. Both are stored in its `entities` record and installed on top of generic CRUD. The library example is therefore runtime data, not production source code.
+- A dynamic entity can include TypeScript `code`, stored in its `entities` record and installed on top of generic CRUD. The library example is therefore runtime data, not production source code.
 
-The only fixed code above generic CRUD is the reusable interpreter for the supported rule vocabulary. It does not name or assume any business entity; it receives names such as `books` only from a runtime entity definition.
+The only fixed behavior above generic CRUD is the runtime-code compiler and its domain facade. It does not name or assume any business entity; it receives names such as `books` only from a runtime entity definition.
 
 ## Request pipeline
 
@@ -66,13 +66,9 @@ The identity is `(namespace, name)`. The runtime uses that pair internally, whic
 
 The system `entities` module is itself an ordinary CRUD entity with extra lifecycle rules. Creating a definition validates its type alias and installs a new module. Updating a definition replaces its schema while retaining its repository. Deleting it removes the installed entity and its endpoint. The catalog is installed only when `EXENSIAL_ENABLE_ENTITY_CATALOG` is not `false`, or when `createApp({ enableEntityCatalog: true })` is used.
 
-## Runtime business logic and code
+## Runtime business code
 
-An entity definition may include a declarative `logic` object. The entity catalog validates and compiles it into operation middleware at runtime, so the schema and business rules arrive in the same HTTP request. Rules are deliberately high-level: validate a value, compare dates, look up a related record, set an input field, patch another entity, or reject the operation. They have `before`, `after`, and `onError` phases around generic CRUD.
-
-The declarative path is not arbitrary uploaded JavaScript. Its interpreter remains infrastructure code, while each entity's definition describes business intent without access to HTTP objects, repositories, filesystem, or process APIs. For example, a loan definition can look up a book, require availability, set a loan status, and change the book's availability using only JSON rules. See [the entity authoring guide](entities.md) for the complete definition.
-
-An entity can additionally send a `code` string containing a TypeScript module with `export default { create, update, ... }`. It compiles to the same operation-middleware contract as `logic`, but receives only a domain facade: input/current/result, `fail`, and record operations on other entities. The facade contains no HTTP request, response, repository, or database objects. Therefore source can survive a later replacement of the in-memory repository by a table repository.
+An entity can send a `code` string containing a TypeScript module with `export default { create, update, ... }`. It receives only a domain facade: input/current/result, `fail`, and record operations on other entities. The facade contains no HTTP request, response, repository, or database objects. Therefore source can survive a later replacement of the in-memory repository by a table repository.
 
 In this MVP the TypeScript executor is deliberately a controlled-development capability, not a security sandbox. It must not be reachable by untrusted callers. See [runtime TypeScript domain modules](runtime-code.md) for its contract and persistence/transaction limitations.
 
@@ -82,7 +78,7 @@ The parser deliberately accepts a narrow, declarative subset: fields of type `st
 
 `@exensial.title <locale> <text>` and `@exensial.description <locale> <text>` are parsed from JSDoc preceding the alias or a field. They are retained in `documentation`, emitted as `x-exensial-localized`, and used to generate standard English OpenAPI text when English is available.
 
-`GET /openapi.json` generates OpenAPI 3.0.4 from the current runtime. It includes active routes, schemas, localized metadata, and `x-exensial-context` containing namespace, module id, and intercepted operations. Every generated CRUD operation has an `operationId`, a purpose-specific description, and schema-derived examples for requests and successful responses. Collection `POST` exposes separate examples for creating one record and importing a list; item operations show id, replacement, partial-update, and error examples. `GET /docs` serves Swagger UI over that generated document.
+`GET /openapi.json` generates OpenAPI 3.0.4 from the current runtime. It includes active routes, schemas, localized metadata, and `x-exensial-context` containing namespace and intercepted operations. Every generated CRUD operation has an `operationId`, a purpose-specific description, and schema-derived examples for requests and successful responses. Collection `POST` exposes separate examples for creating one record and importing a list; item operations show id, replacement, partial-update, and error examples. `GET /docs` serves Swagger UI over that generated document.
 
 ## Technical decisions and current limits
 

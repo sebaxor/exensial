@@ -36,7 +36,7 @@ export interface EntityDefinition {
   name: string;
   fields: Record<string, FieldDefinition>;
   documentation?: Documentation;
-  context?: { namespace?: string; version?: string; group?: string; icon?: string; module?: string; behavior?: Record<string, unknown>; logic?: Record<string, unknown>; code?: string; operations?: string[] };
+  context?: { namespace?: string; version?: string; group?: string; icon?: string; code?: string; operations?: string[] };
 }
 
 export type EntityRecord = Record<string, unknown> & { id: string };
@@ -48,8 +48,5 @@ export type EntityDefinitionRecord = EntityRecord & {
   version: string;
   group?: string;
   icon?: string;
-  module?: string;
-  behavior?: Record<string, unknown>;
-  logic?: Record<string, unknown>;
   code?: string;
 };

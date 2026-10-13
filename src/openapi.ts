@@ -315,13 +315,9 @@ type Task = {
 }
 \`\`\`
 
-### Lógica de negocio en tiempo de ejecución
+### Código de dominio en tiempo de ejecución
 
-Usa el objeto opcional \`logic\` en la misma solicitud que crea una entidad. Es una definición de negocio de alto nivel recibida e instalada por HTTP; no es una selección de módulo del servidor ni JavaScript cargado desde el cliente.
-
-Cada acción CRUD puede declarar reglas \`before\`, \`after\` y \`onError\`. Las reglas disponibles son \`assert\`, \`assertDateOrder\`, \`lookup\`, \`set\`, \`patch\` y \`reject\`. Pueden validar DTOs, consultar una entidad relacionada, asignar un valor calculado, actualizar un registro relacionado o rechazar una operación.
-
-Por ejemplo, las reglas de creación de un préstamo pueden consultar su libro, exigir \`book.available === true\`, asignar el estado \`active\` y actualizar el libro a \`available: false\`. Las reglas de devolución pueden exigir \`status: "returned"\` y una fecha, y luego liberar el libro cuando la actualización del préstamo sea exitosa. Consulta la guía de creación de entidades para la definición JSON completa.`;
+Usa el campo opcional \`code\` en la misma solicitud que crea una entidad. Contiene un módulo TypeScript de alto nivel con funciones para las operaciones CRUD. Es código de dominio recibido e instalado por HTTP y opera con el contexto de registros de Exensial, no con objetos HTTP ni repositorios concretos. Consulta la guía de creación de entidades para el contrato completo.`;
   return `## Start here: define a collection, then create records
 
 An **entity definition** describes which JSON fields a collection accepts. It does not create a book, task, or other record by itself. Send the definition to **POST /v1/entities**, then use the route that Exensial creates for the actual records.
@@ -390,11 +386,7 @@ type Task = {
 }
 \`\`\`
 
-### Runtime business logic
+### Runtime domain code
 
-Use the optional \`logic\` object in the same request that creates an entity. It is a high-level business definition received and installed through HTTP, not a server-side module selection and not uploaded JavaScript.
-
-Each CRUD action can declare \`before\`, \`after\`, and \`onError\` rules. The available rules are \`assert\`, \`assertDateOrder\`, \`lookup\`, \`set\`, \`patch\`, and \`reject\`. They can validate DTO fields, read a related entity, assign a calculated value, update a related record, or reject an operation.
-
-For example, a loan's create rules can look up its book, assert \`book.available === true\`, set its status to \`active\`, and patch the book to \`available: false\`. Its return rules can require \`status: "returned"\` and a date, then release the book after the loan update succeeds. See the entity authoring guide for the complete JSON definition.`;
+Use the optional \`code\` field in the same request that creates an entity. It contains a high-level TypeScript module with functions for CRUD operations. It is domain code received and installed through HTTP and operates through Exensial's record context, not HTTP objects or concrete repositories. See the entity authoring guide for the complete contract.`;
 }
