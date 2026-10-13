@@ -237,6 +237,7 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", icon: "calendar,📅", definition: loansDefinition, code: loansCode });
   await request("POST", "/v1/localizations", [
     { locale: "es", key: "ui.consoleHint", value: "Consola de entidades en tiempo de ejecución" },
+    { locale: "es", key: "ui.loading", value: "Cargando…" },
     { locale: "es", key: "ui.language", value: "Idioma" },
     { locale: "es", key: "ui.rows", value: "Filas" },
     { locale: "es", key: "ui.newRecord", value: "Nuevo registro" },
@@ -267,6 +268,13 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.guest", value: "Invitado" },
     { locale: "es", key: "ui.anonymous", value: "Acceso anónimo" },
     { locale: "es", key: "ui.authenticated", value: "Autenticado" },
+    { locale: "es", key: "ui.username", value: "Usuario" },
+    { locale: "es", key: "ui.password", value: "Contraseña" },
+    { locale: "es", key: "ui.changePassword", value: "Cambiar contraseña" },
+    { locale: "es", key: "ui.currentPassword", value: "Contraseña actual" },
+    { locale: "es", key: "ui.newPassword", value: "Contraseña nueva" },
+    { locale: "es", key: "ui.updatePassword", value: "Actualizar contraseña" },
+    { locale: "es", key: "ui.passwordUpdated", value: "Contraseña actualizada." },
     { locale: "es", key: "ui.group.Library", value: "Biblioteca" },
     { locale: "es", key: "ui.group.System", value: "Sistema" },
     { locale: "es", key: "entity.library.books.title", value: "Libros" },
