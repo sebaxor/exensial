@@ -1,5 +1,5 @@
 const baseUrl = process.argv[2] ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
-const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches"].map((key) => `ui.${key}`));
+const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted"].map((key) => `ui.${key}`));
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -14,21 +14,30 @@ async function request(method: string, path: string, body?: unknown): Promise<an
 
 const booksDefinition = String.raw`/**
  * @exensial.title en Library books
+ * @exensial.title es Libros
  * @exensial.description en Catalog records and copy availability for the library.
  */
 type Book = {
   /** @exensial.title en Title
+   * @exensial.title es Título
    * @exensial.description en The title shown to readers.
    * @exensial.ui.searchable */
   title: string;
-  /** @exensial.ui.searchable */
+  /** @exensial.title en Author
+   * @exensial.title es Autor
+   * @exensial.ui.searchable */
   author: string;
-  /** @exensial.ui.searchable */
+  /** @exensial.title en ISBN
+   * @exensial.title es ISBN
+   * @exensial.ui.searchable */
   isbn: string;
-  /** @exensial.ui.control number */
+  /** @exensial.title en Total copies
+   * @exensial.title es Total de copias
+   * @exensial.ui.control number */
   copiesTotal: number;
   /**
    * @exensial.title en Available copies
+   * @exensial.title es Copias disponibles
    * @exensial.ui.control number
    */
   copiesAvailable?: number;
@@ -36,31 +45,49 @@ type Book = {
 
 const membersDefinition = String.raw`/**
  * @exensial.title en Library members
+ * @exensial.title es Miembros
  * @exensial.description en People who can borrow books from the library.
  */
 type Member = {
-  /** @exensial.ui.searchable */
+  /** @exensial.title en Name
+   * @exensial.title es Nombre
+   * @exensial.ui.searchable */
   name: string;
-  /** @exensial.ui.control email
+  /** @exensial.title en Email
+   * @exensial.title es Correo electrónico
+   * @exensial.ui.control email
    * @exensial.ui.searchable */
   email: string;
+  /** @exensial.title en Active
+   * @exensial.title es Activo */
   active?: boolean;
 }`;
 
 const loansDefinition = String.raw`/**
  * @exensial.title en Book loans
+ * @exensial.title es Préstamos
  * @exensial.description en Circulation records for borrowed and returned books.
  */
 type Loan = {
-  /** @exensial.relation library/books label=title */
+  /** @exensial.title en Book
+   * @exensial.title es Libro
+   * @exensial.relation library/books label=title */
   book: Book;
-  /** @exensial.relation library/members label=name */
+  /** @exensial.title en Member
+   * @exensial.title es Miembro
+   * @exensial.relation library/members label=name */
   member: Member;
-  /** @exensial.ui.control datetime */
+  /** @exensial.title en Borrowed at
+   * @exensial.title es Fecha de préstamo
+   * @exensial.ui.control datetime */
   borrowedAt: string;
-  /** @exensial.ui.control datetime */
+  /** @exensial.title en Due at
+   * @exensial.title es Fecha límite
+   * @exensial.ui.control datetime */
   dueAt: string;
-  /** @exensial.ui.control datetime */
+  /** @exensial.title en Returned at
+   * @exensial.title es Fecha de devolución
+   * @exensial.ui.control datetime */
   returnedAt?: string;
   /** @exensial.ui.hidden */
   status?: string;
@@ -156,6 +183,7 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.language", value: "Idioma" },
     { locale: "es", key: "ui.rows", value: "Filas" },
     { locale: "es", key: "ui.newRecord", value: "Nuevo registro" },
+    { locale: "es", key: "ui.new", value: "Nuevo" },
     { locale: "es", key: "ui.save", value: "Guardar" },
     { locale: "es", key: "ui.cancel", value: "Cancelar" },
     { locale: "es", key: "ui.close", value: "Cerrar" },
@@ -172,6 +200,10 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.matchingRecords", value: "registros coincidentes" },
     { locale: "es", key: "ui.noRecords", value: "Aún no hay registros." },
     { locale: "es", key: "ui.noMatches", value: "No hay registros coincidentes." },
+    { locale: "es", key: "ui.find", value: "Buscar" },
+    { locale: "es", key: "ui.noRecordSelected", value: "No se ha seleccionado un registro" },
+    { locale: "es", key: "ui.saved", value: "Guardado." },
+    { locale: "es", key: "ui.deleted", value: "Eliminado." },
     { locale: "es", key: "entity.library.books.title", value: "Libros" },
     { locale: "es", key: "entity.library.members.title", value: "Miembros" },
     { locale: "es", key: "entity.library.loans.title", value: "Préstamos" },
