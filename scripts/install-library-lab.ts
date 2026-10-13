@@ -1,5 +1,5 @@
 const baseUrl = process.argv[2] ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
-const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted"].map((key) => `ui.${key}`));
+const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "group.Library", "group.System"].map((key) => `ui.${key}`));
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -204,6 +204,8 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.noRecordSelected", value: "No se ha seleccionado un registro" },
     { locale: "es", key: "ui.saved", value: "Guardado." },
     { locale: "es", key: "ui.deleted", value: "Eliminado." },
+    { locale: "es", key: "ui.group.Library", value: "Biblioteca" },
+    { locale: "es", key: "ui.group.System", value: "Sistema" },
     { locale: "es", key: "entity.library.books.title", value: "Libros" },
     { locale: "es", key: "entity.library.members.title", value: "Miembros" },
     { locale: "es", key: "entity.library.loans.title", value: "Préstamos" },
