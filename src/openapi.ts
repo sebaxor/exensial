@@ -4,13 +4,13 @@ import { localizedValue, type LocalizationEntry } from "./application/localizati
 type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
-export interface OpenApiOptions { exensialQuery?: boolean; language?: string; localizations?: LocalizationEntry[]; }
+export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; language?: string; localizations?: LocalizationEntry[]; }
 
 export function createOpenApi(definitions: EntityDefinition[], capabilities: OpenApiOptions = {}): Record<string, unknown> {
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
-  const paths = Object.assign({}, ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
+  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths()] : []), ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
   return {
     openapi: "3.0.4",
     info: {
@@ -30,7 +30,19 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
       }
     } : {},
     paths,
-    components: { schemas }
+    components: { schemas, ...(capabilities.security ? { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT", description: "Obtain a token from POST /v1/auth/login and send it as Authorization: Bearer <token>. Endpoint permissions decide whether authentication is required." } } } : {}) }
+  };
+}
+
+function authenticationPaths(): Record<string, unknown> {
+  return {
+    "/v1/auth/login": {
+      post: {
+        tags: ["Authentication"], operationId: "login", summary: "Create a local JWT session", description: "Checks a local Exensial user and returns a short-lived Bearer token. A future identity-provider adapter can populate the same principal context.",
+        requestBody: { required: true, content: jsonContent({ type: "object", required: ["username", "password"], properties: { username: { type: "string" }, password: { type: "string", format: "password" } } }, { username: "admin", password: "admin123" }) },
+        responses: { 200: { description: "Authenticated", content: jsonContent({ type: "object", properties: { accessToken: { type: "string" }, tokenType: { type: "string" }, expiresIn: { type: "integer" } } }, { accessToken: "eyJ...", tokenType: "Bearer", expiresIn: 28800 }) }, 401: { description: "Invalid credentials" } }
+      }
+    }
   };
 }
 

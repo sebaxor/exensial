@@ -4,6 +4,7 @@ import test from "node:test";
 import { createApp } from "../src/app";
 import type { AppOptions } from "../src/app";
 import type { EntityBehaviorModule } from "../src/application/entity-behaviors";
+import { hashPassword } from "../src/application/security";
 
 async function withApi(run: (baseUrl: string) => Promise<void>, options: AppOptions = {}) {
   const server = createServer(createApp(options));
@@ -47,6 +48,22 @@ test("returns correct errors for duplicate entities and invalid record routes", 
     assert.equal((await createEntity()).status, 201);
     assert.equal((await createEntity()).status, 409);
     assert.equal((await fetch(`${baseUrl}/v1/tasks/missing`, { method: "PATCH", headers: { "content-type": "application/json" }, body: "not json" })).status, 404);
+  });
+});
+
+test("enforces endpoint permissions while leaving unconfigured endpoints anonymous", async () => {
+  await withApi(async (baseUrl) => {
+    const json = { "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: json, body: JSON.stringify({ name: "books", namespace: "library", definition: "type Book = { title: string }" }) });
+    await fetch(`${baseUrl}/v1/roles`, { method: "POST", headers: json, body: JSON.stringify({ name: "admin" }) });
+    await fetch(`${baseUrl}/v1/users`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", passwordHash: hashPassword("secret"), roles: ["admin"], active: true }) });
+    await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: "admin", method: "POST", path: "/v1/library/books*", effect: "allow" }]) });
+    assert.equal((await fetch(`${baseUrl}/v1/library/books`)).status, 200);
+    assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: json, body: JSON.stringify({ title: "Blocked" }) })).status, 401);
+    const login = await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: json, body: JSON.stringify({ username: "admin", password: "secret" }) });
+    assert.equal(login.status, 200);
+    const { accessToken } = await login.json() as { accessToken: string };
+    assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: { ...json, authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ title: "Allowed" }) })).status, 201);
   });
 });
 
@@ -118,6 +135,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.equal(schema.properties.price["x-exensial-ui"].control, "money");
     assert.deepEqual(schema.properties.categoryId["x-exensial-ui"].relation, { namespace: "catalog", entity: "categories", label: "name" });
     assert.ok(openapi.paths["/v1/documented-products"]);
+    assert.ok(openapi.paths["/v1/auth/login"]);
+    assert.equal(openapi.components.securitySchemes.bearerAuth.scheme, "bearer");
     const collection = openapi.paths["/v1/documented-products"];
     assert.equal(collection.get.operationId, "listDocumentedProducts");
     assert.match(collection.get.description, /Returns every record/);

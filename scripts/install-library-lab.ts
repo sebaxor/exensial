@@ -1,15 +1,24 @@
-const baseUrl = process.argv[2] ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
+import { hashPassword } from "../src/application/security";
+
+const withPermissions = process.argv.includes("--permissions");
+const baseUrl = process.argv.find((argument) => argument.startsWith("http")) ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
+let accessToken: string | undefined;
 const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "group.Library", "group.System"].map((key) => `ui.${key}`));
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
-    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const data = response.status === 204 ? undefined : await response.json();
   if (!response.ok) throw new Error(`${method} ${path}: ${data?.error ?? response.statusText}`);
   return data;
+}
+
+async function signInIfPresent(): Promise<void> {
+  const response = await fetch(`${baseUrl}/v1/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin123" }) });
+  if (response.ok) accessToken = (await response.json()).accessToken;
 }
 
 const booksDefinition = String.raw`/**
@@ -165,12 +174,37 @@ export default {
 };`;
 
 async function resetLibrary(): Promise<void> {
+  if (withPermissions) {
+    await signInIfPresent();
+    for (const entity of ["permissions", "users", "roles"]) {
+      const records = await request("GET", `/v1/${entity}`) as Array<{ id: string }>;
+      for (const record of records) await request("DELETE", `/v1/${entity}/${record.id}`);
+    }
+    accessToken = undefined;
+  }
   const entities = await request("GET", "/v1/entities") as Array<{ id: string; name: string; namespace?: string }>;
   for (const entity of entities.filter((item) => item.namespace === "library" && ["loans", "members", "books"].includes(item.name))) {
     await request("DELETE", `/v1/entities/${entity.id}`);
   }
   const localizations = await request("GET", "/v1/localizations") as Array<{ id: string; key: string; locale: string }>;
   for (const entry of localizations.filter((item) => item.key.startsWith("entity.library.") || (item.locale === "es" && labUiKeys.has(item.key)))) await request("DELETE", `/v1/localizations/${entry.id}`);
+}
+
+async function installPermissions(): Promise<void> {
+  await request("POST", "/v1/roles", [
+    { name: "library-reader", description: "Reads the public book catalog." },
+    { name: "library-admin", description: "Administers the library and Exensial system catalogs." }
+  ]);
+  await request("POST", "/v1/users", [
+    { username: "reader", passwordHash: hashPassword("reader123"), roles: ["library-reader"], active: true },
+    { username: "admin", passwordHash: hashPassword("admin123"), roles: ["library-admin"], active: true }
+  ]);
+  const protectedPaths = ["/v1/library/members*", "/v1/library/loans*", "/v1/entities*", "/v1/localizations*", "/v1/requests*", "/v1/responses*", "/v1/roles*", "/v1/users*", "/v1/permissions*"];
+  const permissions = [
+    ...["POST", "PUT", "PATCH", "DELETE"].map((method) => ({ role: "library-admin", method, path: "/v1/library/books*", effect: "allow" })),
+    ...protectedPaths.map((path) => ({ role: "library-admin", method: "*", path, effect: "allow" }))
+  ];
+  await request("POST", "/v1/permissions", permissions);
 }
 
 async function install(): Promise<void> {
@@ -231,7 +265,8 @@ async function install(): Promise<void> {
   await request("POST", "/v1/library/loans", { book: books[0].id, member: members[1].id, borrowedAt: "2026-10-06T10:00:00.000Z", dueAt: "2026-10-20T23:59:59.000Z" });
   const returned = await request("POST", "/v1/library/loans", { book: books[1].id, member: members[2].id, borrowedAt: "2026-09-20T10:00:00.000Z", dueAt: "2026-10-04T23:59:59.000Z" });
   await request("PATCH", `/v1/library/loans/${returned.id}`, { status: "returned", returnedAt: "2026-10-02T16:30:00.000Z" });
-  console.log(`Library lab installed at ${baseUrl}: ${books.length} books, ${members.length} members, 3 loans.`);
+  if (withPermissions) await installPermissions();
+  console.log(`Library lab${withPermissions ? " with permissions" : ""} installed at ${baseUrl}: ${books.length} books, ${members.length} members, 3 loans.`);
 }
 
 install().catch((error) => { console.error(error); process.exitCode = 1; });

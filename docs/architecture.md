@@ -88,5 +88,5 @@ The parser deliberately accepts a narrow, declarative subset: fields of type `st
 - TypeScript executes through `tsx`, while `tsc --noEmit` remains the static type check.
 - Repositories, operation middleware, and HTTP adapters are independent seams for future persistence and transports.
 - Runtime definitions and their data are in memory; restarting the process clears both.
-- Authentication, authorization, migrations, typed arrays, dates, and richer constraints are intentionally outside this minimal implementation. Collection pagination is supported through `page` and `perPage` query parameters plus response headers.
+- The optional security layer adds local JWT authentication and role-based endpoint permissions before the CRUD pipeline; it can be disabled with `EXENSIAL_ENABLE_SECURITY=false`. Identity providers, migrations, typed arrays, dates, and richer constraints remain extension points. Collection pagination is supported through `page` and `perPage` query parameters plus response headers.
 - Query engines are optional technical capabilities, rather than an implicit feature of CRUD. When enabled, each declares its root and contract in `x-exensial-capabilities` in OpenAPI. The current `ExensialQuery` engine is a safe, read-only OData-like subset backed by the repository query boundary; GraphQL and OData can be added later as independent engines.

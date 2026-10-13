@@ -16,3 +16,4 @@ Labs are independent by namespace. They can be removed by deleting their `entiti
 ## Available labs
 
 - [Library circulation](library.md): catalog copies, members, loans, availability reservation, and return.
+- [Library permissions](../security.md#library-lab-with-permissions): the same lab with a public catalog and protected administration.

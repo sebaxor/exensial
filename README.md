@@ -58,6 +58,8 @@ The entity catalog is enabled by default. Run `EXENSIAL_ENABLE_ENTITY_CATALOG=fa
 
 Read [the entity authoring guide](docs/entities.md) for type syntax, localized JSDoc, namespaces, and business behavior. Read [the architecture](docs/architecture.md) for pipeline and design decisions.
 
+Read [authentication and endpoint permissions](docs/security.md) for the optional JWT policy layer and the protected library lab.
+
 Optional technical capabilities are announced dynamically in OpenAPI. The current [ExensialQuery capability](docs/exensial-query.md) provides a safe, OData-like filtered read endpoint for metadata-driven clients.
 
 [Runtime localization](docs/localization.md) is a system entity that can override generated OpenAPI and Console labels per language without redeploying entity code.

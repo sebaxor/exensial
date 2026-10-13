@@ -8,6 +8,7 @@ import type { DomainResponse } from "../domain/response";
 import { BadRequestError, parseJson, readBody, sendEmpty, sendJson } from "../http";
 import { createOpenApi } from "../openapi";
 import { consoleHtml } from "../ui/console";
+import { authenticate, authorize, issueToken, readToken, type SecurityPrincipal, UnauthorizedError, ForbiddenError } from "../application/security";
 
 type HttpInput = { method: string; url: string; body?: string };
 export type RequestContext = {
@@ -18,6 +19,7 @@ export type RequestContext = {
   domainRequest?: DomainRequest;
   domainResponse?: DomainResponse;
   requestRecord?: EntityRecord;
+  principal?: SecurityPrincipal;
 };
 export type Middleware = (context: RequestContext, next: () => Promise<void>) => Promise<void>;
 
@@ -49,7 +51,7 @@ export function httpAdapterMiddleware(): Middleware {
 }
 
 /** Serves generated API documentation without coupling the domain runtime to HTTP. */
-export function documentationMiddleware(runtime: EntityRuntime, options: { exensialQuery?: boolean } = {}): Middleware {
+export function documentationMiddleware(runtime: EntityRuntime, options: { exensialQuery?: boolean; security?: boolean } = {}): Middleware {
   return async (context, next) => {
     const url = new URL(requireHttpInput(context).url, "http://localhost");
     const pathname = url.pathname;
@@ -68,6 +70,34 @@ export function documentationMiddleware(runtime: EntityRuntime, options: { exens
       context.domainResponse = { status: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: consoleHtml() };
       return;
     }
+    await next();
+  };
+}
+
+/** Handles local JWT login. Other identity providers can populate context.principal before authorization. */
+export function authenticationMiddleware(runtime: EntityRuntime, enabled = true): Middleware {
+  return async (context, next) => {
+    if (!enabled) return next();
+    const input = requireHttpInput(context);
+    const url = new URL(input.url, "http://localhost");
+    if (url.pathname === "/v1/auth/login") {
+      if (input.method !== "POST") throw new MethodNotAllowedError();
+      const payload = parseJson(input.body ?? "") as Record<string, unknown>;
+      const principal = authenticate(runtime, payload.username, payload.password);
+      context.domainResponse = { status: 200, body: { accessToken: issueToken(principal, process.env.EXENSIAL_JWT_SECRET ?? "exensial-development-secret"), tokenType: "Bearer", expiresIn: 28_800, user: principal } };
+      return;
+    }
+    context.principal = readToken(context.request.headers.authorization, process.env.EXENSIAL_JWT_SECRET ?? "exensial-development-secret");
+    await next();
+  };
+}
+
+/** Enforces endpoint policy after REST route capture and before any entity mutation. */
+export function authorizationMiddleware(runtime: EntityRuntime, enabled = true): Middleware {
+  return async (context, next) => {
+    if (!enabled) return next();
+    const input = requireHttpInput(context);
+    authorize(runtime, context.principal, input.method, new URL(input.url, "http://localhost").pathname);
     await next();
   };
 }
@@ -216,6 +246,8 @@ function requireHttpInput(context: RequestContext): HttpInput {
 }
 
 function errorResponse(error: unknown): DomainResponse {
+  if (error instanceof UnauthorizedError) return { status: 401, headers: { "www-authenticate": "Bearer" }, body: { error: error.message } };
+  if (error instanceof ForbiddenError) return { status: 403, body: { error: error.message } };
   if (error instanceof EntityNotFoundError) return { status: 404, body: { error: error.message } };
   if (error instanceof EntityConflictError) return { status: 409, body: { error: error.message } };
   if (error instanceof MethodNotAllowedError) return { status: 405, body: { error: error.message } };

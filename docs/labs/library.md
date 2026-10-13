@@ -96,6 +96,8 @@ npm start
 npm run lab:library
 ```
 
+For the same domain with a public book catalog and JWT-protected administration, run `npm run lab:library:permissions`. The users, roles, permission rules, credentials, and policy behavior are documented in [Authentication and endpoint permissions](../security.md).
+
 Pass another local or remote base URL when needed:
 
 ```bash
