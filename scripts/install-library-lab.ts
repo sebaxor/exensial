@@ -3,7 +3,7 @@ import { hashPassword } from "../src/application/security";
 const withPermissions = process.argv.includes("--permissions");
 const baseUrl = process.argv.find((argument) => argument.startsWith("http")) ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
 let accessToken: string | undefined;
-const labUiKeys = new Set(["consoleHint", "loading", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "deleteConfirmation", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noEntities", "noMatches", "noSearchFields", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "username", "password", "changePassword", "currentPassword", "newPassword", "updatePassword", "passwordUpdated", "editProfile", "email", "group.Library", "group.System"].map((key) => `ui.${key}`));
+const labUiKeys = new Set(["consoleHint", "loading", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "deleteConfirmation", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noEntities", "noMatches", "noSearchFields", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "sessionExpired", "username", "password", "changePassword", "currentPassword", "newPassword", "updatePassword", "passwordUpdated", "editProfile", "email", "group.Library", "group.System"].map((key) => `ui.${key}`));
 const labEntityLocalizationPrefixes = ["library.", "openapi.exensialQuery.", "entity.library.", "entity.roles.", "entity.users.", "entity.userRoles.", "entity.permissions.", "entity.entities.", "entity.localizations.", "entity.requests.", "entity.responses."];
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
@@ -362,6 +362,7 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.guest", value: "Invitado" },
     { locale: "es", key: "ui.anonymous", value: "Acceso anónimo" },
     { locale: "es", key: "ui.authenticated", value: "Autenticado" },
+    { locale: "es", key: "ui.sessionExpired", value: "Tu sesión expiró. Inicia sesión de nuevo." },
     { locale: "es", key: "ui.username", value: "Usuario" },
     { locale: "es", key: "ui.password", value: "Contraseña" },
     { locale: "es", key: "ui.changePassword", value: "Cambiar contraseña" },
