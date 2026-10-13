@@ -3,7 +3,7 @@ import { hashPassword } from "../src/application/security";
 const withPermissions = process.argv.includes("--permissions");
 const baseUrl = process.argv.find((argument) => argument.startsWith("http")) ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
 let accessToken: string | undefined;
-const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "group.Library", "group.System"].map((key) => `ui.${key}`));
+const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "group.Library", "group.System"].map((key) => `ui.${key}`));
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -240,6 +240,11 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.noRecordSelected", value: "No se ha seleccionado un registro" },
     { locale: "es", key: "ui.saved", value: "Guardado." },
     { locale: "es", key: "ui.deleted", value: "Eliminado." },
+    { locale: "es", key: "ui.signIn", value: "Iniciar sesión" },
+    { locale: "es", key: "ui.signOut", value: "Cerrar sesión" },
+    { locale: "es", key: "ui.guest", value: "Invitado" },
+    { locale: "es", key: "ui.anonymous", value: "Acceso anónimo" },
+    { locale: "es", key: "ui.authenticated", value: "Autenticado" },
     { locale: "es", key: "ui.group.Library", value: "Biblioteca" },
     { locale: "es", key: "ui.group.System", value: "Sistema" },
     { locale: "es", key: "entity.library.books.title", value: "Libros" },
