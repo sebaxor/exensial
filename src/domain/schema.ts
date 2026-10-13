@@ -18,11 +18,15 @@ export function parseEntitySource(source: string): { typeName: string; fields: R
     if (!scalar && !ui?.relation) throw new ValidationError(`Reference field ${name} needs @exensial.relation`);
     const fieldType = scalar ? type as ScalarType : "string";
     const defaultValue = parseDefault(fieldComment);
+    const enumValues = parseEnum(fieldComment);
+    if (enumValues && fieldType !== "string") throw new ValidationError(`@exensial.enum can only be used with string field "${name}".`);
+    if (enumValues && defaultValue.specified && !enumValues.includes(String(defaultValue.value))) throw new ValidationError(`Default value for field "${name}" must be one of: ${enumValues.join(", ")}.`);
     if (defaultValue.specified && !hasExpectedType(defaultValue.value, fieldType)) throw new ValidationError(`Default value for field "${name}" must be ${fieldType}.`);
     fields[name] = {
       type: fieldType,
       // A server-side default makes the input optional even when the type property is not marked `?`.
       required: !optional && !defaultValue.specified,
+      ...(enumValues ? { enum: enumValues } : {}),
       ...(defaultValue.specified ? { default: defaultValue.value } : {}),
       documentation: parseDocumentation(fieldComment),
       ui
@@ -53,6 +57,7 @@ export function validateRecord(
     const field = fields[name];
     if (!field) throw new ValidationError(`Unknown field "${name}".`);
     if (!hasExpectedType(value, field.type)) throw new ValidationError(`Invalid value for field "${name}": expected ${field.type}.`);
+    if (field.enum && !field.enum.includes(String(value))) throw new ValidationError(`Invalid value for field "${name}": expected one of ${field.enum.join(", ")}.`);
   }
   if (!partial) {
     for (const [name, field] of Object.entries(fields)) {
@@ -126,6 +131,16 @@ function parseDefault(comment?: string): { specified: boolean; value?: unknown }
   if (!source) throw new ValidationError("@exensial.default requires a JSON value");
   try { return { specified: true, value: JSON.parse(source) }; }
   catch { throw new ValidationError("@exensial.default must contain a valid JSON value"); }
+}
+
+/** Parses fixed string alternatives from `@exensial.enum allow deny`. */
+function parseEnum(comment?: string): string[] | undefined {
+  if (!comment) return undefined;
+  const line = comment.split("\n").map((item) => item.replace(/^\s*\*?\s*/, "").trim()).find((item) => /^@exensial\.enum(?:\s|$)/.test(item));
+  if (!line) return undefined;
+  const values = line.replace(/^@exensial\.enum\s*/, "").split(/\s+/).filter(Boolean);
+  if (values.length < 1 || new Set(values).size !== values.length) throw new ValidationError("@exensial.enum requires unique string values");
+  return values;
 }
 
 export class ValidationError extends Error {}

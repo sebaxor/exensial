@@ -44,8 +44,8 @@ function applyAuthorizationMetadata(paths: Record<string, unknown>, permissions:
       if (!/^(get|post|put|patch|delete)$/i.test(method) || !operation || typeof operation !== "object") continue;
       const rules = permissions.filter((permission) => (String(permission.method) === "*" || String(permission.method).toUpperCase() === method.toUpperCase()) && matchesPath(String(permission.path), path));
       if (!rules.length) continue;
-      const metadata = rules.map(({ role, effect, method: ruleMethod, path: rulePath }) => ({ role: roleName(role), effect, method: ruleMethod, path: rulePath }));
-      const anonymous = metadata.some((rule) => rule.role === "anonymous" && rule.effect === "allow");
+      const metadata = rules.map(({ role, decision, method: ruleMethod, path: rulePath }) => ({ role: roleName(role), decision, method: ruleMethod, path: rulePath }));
+      const anonymous = metadata.some((rule) => rule.role === "anonymous" && rule.decision === "allow");
       Object.assign(operation as Record<string, unknown>, { ...(anonymous ? {} : { security: [{ bearerAuth: [] }] }), "x-exensial-authorization": { required: !anonymous, anonymous, rules: metadata } });
     }
   }
@@ -115,6 +115,7 @@ function fieldSchema(field: FieldDefinition, language: string, localizations: Lo
     ...uiFormat(field.ui?.control),
     title: localizedValue(localizations, language, `${key}.title`, field.documentation?.title),
     description: localizedValue(localizations, language, `${key}.description`, field.documentation?.description),
+    ...(field.enum ? { enum: field.enum } : {}),
     ...("default" in field ? { default: field.default } : {}),
     "x-exensial-localized": field.documentation,
     "x-exensial-ui": field.ui

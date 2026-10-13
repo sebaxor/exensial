@@ -19,8 +19,10 @@ type Book = {
   /** @exensial.ui.searchable */
   isbn: string;
   /** @exensial.ui.control number */
+  /** @exensial.default 1 */
   copiesTotal: number;
   /** @exensial.ui.control number */
+  /** @exensial.default 1 */
   copiesAvailable?: number;
 }
 

@@ -57,12 +57,14 @@ type Book = {
   isbn: string;
   /** @exensial.title en Total copies
    * @exensial.title es Total de copias
-   * @exensial.ui.control number */
+   * @exensial.ui.control number
+   * @exensial.default 1 */
   copiesTotal: number;
   /**
    * @exensial.title en Available copies
    * @exensial.title es Copias disponibles
    * @exensial.ui.control number
+   * @exensial.default 1
    */
   copiesAvailable?: number;
 }`;
@@ -264,13 +266,13 @@ async function installPermissions(): Promise<void> {
   }
   const protectedPaths = ["/v1/library/members*", "/v1/library/loans*", "/v1/entities*", "/v1/localizations*", "/v1/requests*", "/v1/responses*", "/v1/roles*", "/v1/users*", "/v1/userRoles*", "/v1/permissions*"];
   const permissions = [
-    { role: roleId.anonymous, method: "GET", path: "/v1/library/books*", effect: "allow" },
-    { role: roleId.anonymous, method: "GET", path: "/v1/query/exensial/library/books*", effect: "allow" },
-    { role: roleId["library-reader"], method: "GET", path: "/v1/*", effect: "allow" },
-    { role: roleId["library-admin"], method: "GET", path: "/v1/library/books*", effect: "allow" },
-    { role: roleId["library-admin"], method: "GET", path: "/v1/query/exensial/*", effect: "allow" },
-    ...["POST", "PUT", "PATCH", "DELETE"].map((method) => ({ role: roleId["library-admin"], method, path: "/v1/library/books*", effect: "allow" })),
-    ...protectedPaths.map((path) => ({ role: roleId["library-admin"], method: "*", path, effect: "allow" }))
+    { role: roleId.anonymous, method: "GET", path: "/v1/library/books*", decision: "allow" },
+    { role: roleId.anonymous, method: "GET", path: "/v1/query/exensial/library/books*", decision: "allow" },
+    { role: roleId["library-reader"], method: "GET", path: "/v1/*", decision: "allow" },
+    { role: roleId["library-admin"], method: "GET", path: "/v1/library/books*", decision: "allow" },
+    { role: roleId["library-admin"], method: "GET", path: "/v1/query/exensial/*", decision: "allow" },
+    ...["POST", "PUT", "PATCH", "DELETE"].map((method) => ({ role: roleId["library-admin"], method, path: "/v1/library/books*", decision: "allow" })),
+    ...protectedPaths.map((path) => ({ role: roleId["library-admin"], method: "*", path, decision: "allow" }))
   ];
   await request("POST", "/v1/permissions", permissions);
 }
@@ -357,7 +359,7 @@ async function install(): Promise<void> {
     ,{ locale: "es", key: "entity.permissions.field.role.title", value: "Rol" }
     ,{ locale: "es", key: "entity.permissions.field.method.title", value: "Método HTTP" }
     ,{ locale: "es", key: "entity.permissions.field.path.title", value: "Patrón de ruta" }
-    ,{ locale: "es", key: "entity.permissions.field.effect.title", value: "Efecto" }
+    ,{ locale: "es", key: "entity.permissions.field.decision.title", value: "Decisión de permiso" }
     ,{ locale: "es", key: "entity.entities.title", value: "Catálogo de entidades" }
     ,{ locale: "es", key: "entity.entities.field.name.title", value: "Nombre de ruta" }
     ,{ locale: "es", key: "entity.entities.field.version.title", value: "Versión de entidad" }

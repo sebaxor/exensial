@@ -30,6 +30,8 @@ export interface FieldUi {
 export interface FieldDefinition {
   type: ScalarType;
   required: boolean;
+  /** Allowed string values, published as the standard OpenAPI Schema `enum`. */
+  enum?: string[];
   /** JSON-compatible value applied when this field is omitted on creation. */
   default?: unknown;
   documentation?: Documentation;

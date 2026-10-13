@@ -130,6 +130,19 @@ The annotation value must be valid JSON: quote strings, use `true` or `false` fo
 
 Exensial publishes this through the standard OpenAPI Schema Object `default` property—no custom extension is needed. Generic clients can use it safely; the bundled Console uses it to prefill the **New record** form.
 
+## Fixed string choices
+
+Use `@exensial.enum` to constrain a `string` field to a small, fixed set of values. Exensial validates the value server-side, emits OpenAPI's standard `enum` property, and the bundled Console renders a dropdown automatically.
+
+```ts
+type EndpointPermission = {
+  /** @exensial.enum allow deny */
+  decision: string;
+}
+```
+
+This is appropriate for stable domain states such as a permission decision. It is not a replacement for a related runtime entity when the available choices are records managed by users.
+
 ## UI metadata and relations
 
 Field JSDoc can also declare presentation hints. Exensial exports them under the vendor extension `x-exensial-ui` in OpenAPI; consumers that do not understand the extension can safely ignore it.

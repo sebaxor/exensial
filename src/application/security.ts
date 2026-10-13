@@ -70,11 +70,11 @@ export function authorize(runtime: EntityRuntime, principal: SecurityPrincipal |
   if (!matches.length) return; // Unconfigured endpoints remain anonymous by design.
   // A public endpoint stays public when a client happens to send a valid token.
   // Authentication must add capabilities, never remove anonymous read access.
-  if (matches.some((permission) => roleName(runtime, permission.role) === "anonymous" && permission.effect === "allow")) return;
+  if (matches.some((permission) => roleName(runtime, permission.role) === "anonymous" && permission.decision === "allow")) return;
   if (!principal) throw new UnauthorizedError("Authentication is required for this endpoint");
   const roleMatches = matches.filter((permission) => principal.roles.includes(roleName(runtime, permission.role)));
-  if (roleMatches.some((permission) => permission.effect === "deny")) throw new ForbiddenError("Your roles are denied access to this endpoint");
-  if (!roleMatches.some((permission) => permission.effect === "allow")) throw new ForbiddenError("Your roles do not grant access to this endpoint");
+  if (roleMatches.some((permission) => permission.decision === "deny")) throw new ForbiddenError("Your roles are denied access to this endpoint");
+  if (!roleMatches.some((permission) => permission.decision === "allow")) throw new ForbiddenError("Your roles do not grant access to this endpoint");
 }
 
 function roleName(runtime: EntityRuntime, value: unknown): string {

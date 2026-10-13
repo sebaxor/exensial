@@ -80,7 +80,7 @@ test("enforces endpoint permissions while leaving unconfigured endpoints anonymo
     const roles = await (await fetch(`${baseUrl}/v1/roles`, { method: "POST", headers: json, body: JSON.stringify([{ name: "anonymous" }, { name: "reader" }, { name: "admin" }]) })).json() as { items: Array<{ id: string; name: string }> };
     const roleId = Object.fromEntries(roles.items.map((role) => [role.name, role.id]));
     await fetch(`${baseUrl}/v1/users`, { method: "POST", headers: json, body: JSON.stringify([{ username: "admin", passwordHash: hashPassword("secret"), roles: ["admin"], active: true }, { username: "reader", passwordHash: hashPassword("reader-secret"), roles: ["reader"], active: true }]) });
-    await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: roleId.anonymous, method: "GET", path: "/v1/library/books*", effect: "allow" }, { role: roleId.reader, method: "GET", path: "/v1/*", effect: "allow" }, { role: roleId.admin, method: "POST", path: "/v1/library/books*", effect: "allow" }, { role: roleId.admin, method: "GET", path: "/v1/users*", effect: "allow" }, { role: roleId.admin, method: "GET", path: "/v1/query/exensial/library/members*", effect: "allow" }]) });
+    await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: roleId.anonymous, method: "GET", path: "/v1/library/books*", decision: "allow" }, { role: roleId.reader, method: "GET", path: "/v1/*", decision: "allow" }, { role: roleId.admin, method: "POST", path: "/v1/library/books*", decision: "allow" }, { role: roleId.admin, method: "GET", path: "/v1/users*", decision: "allow" }, { role: roleId.admin, method: "GET", path: "/v1/query/exensial/library/members*", decision: "allow" }]) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.paths["/v1/library/books"].post.security[0].bearerAuth.length, 0);
     assert.equal(openapi.paths["/v1/library/books"].post["x-exensial-authorization"].rules[0].role, "admin");
@@ -143,6 +143,23 @@ test("applies JSDoc defaults on creation and exposes standard OpenAPI defaults",
     assert.equal(properties.priority.default, 3);
     assert.deepEqual(properties.metadata.default, { labels: [] });
     assert.equal(openapi.components.schemas["defaulted-tasks"].required.includes("status"), false);
+  });
+});
+
+test("validates fixed string choices and publishes them as an OpenAPI enum", async () => {
+  await withApi(async (baseUrl) => {
+    const definition = `type Permission = {
+  /** @exensial.enum allow deny */
+  decision: string;
+}`;
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "test-permissions", definition }) });
+    const headers = { "content-type": "application/json" };
+    assert.equal((await fetch(`${baseUrl}/v1/test-permissions`, { method: "POST", headers, body: JSON.stringify({ decision: "allow" }) })).status, 201);
+    const rejected = await fetch(`${baseUrl}/v1/test-permissions`, { method: "POST", headers, body: JSON.stringify({ decision: "maybe" }) });
+    assert.equal(rejected.status, 400);
+    assert.equal((await rejected.json()).error, 'Invalid value for field "decision": expected one of allow, deny.');
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.deepEqual(openapi.components.schemas["test-permissions"].properties.decision.enum, ["allow", "deny"]);
   });
 });
 

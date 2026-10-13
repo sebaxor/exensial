@@ -186,9 +186,12 @@ type EndpointPermission = {
    * @exensial.title es Patrón de ruta
    * @exensial.ui.searchable */
   path: string;
-  /** @exensial.title en Effect
-   * @exensial.title es Efecto */
-  effect: string;
+  /** @exensial.title en Permission decision
+   * @exensial.title es Decisión de permiso
+   * @exensial.description en Whether this rule grants or rejects access.
+   * @exensial.description es Si esta regla concede o rechaza el acceso.
+   * @exensial.enum allow deny */
+  decision: string;
 }`
   }
 ];
