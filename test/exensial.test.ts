@@ -387,6 +387,28 @@ test("uses localized runtime failures and can assign a server-side timestamp", a
   });
 });
 
+test("supports domain-enforced unique relation associations", async () => {
+  await withApi(async (baseUrl) => {
+    const post = (path: string, body: unknown, language = "en") => fetch(`${baseUrl}${path}`, {
+      method: "POST", headers: { "content-type": "application/json", "accept-language": language }, body: JSON.stringify(body)
+    });
+    await post("/v1/localizations", [{ locale: "es", key: "library.members.error.userAlreadyAssigned", value: "Un usuario solo puede estar asociado a un miembro." }]);
+    await post("/v1/entities", {
+      name: "members", namespace: "unique-library", definition: "type Member = { name: string; user?: string }",
+      code: `export default { create: async (context, next) => {
+        if (context.input.user && context.collection("members", "unique-library").findBy("user", context.input.user).length) {
+          context.fail("library.members.error.userAlreadyAssigned", "A user can be associated with only one member");
+        }
+        await next();
+      } }`
+    });
+    assert.equal((await post("/v1/unique-library/members", { name: "Ana", user: "user-1" })).status, 201);
+    const duplicate = await post("/v1/unique-library/members", { name: "Mateo", user: "user-1" }, "es");
+    assert.equal(duplicate.status, 400);
+    assert.equal((await duplicate.json()).error, "Un usuario solo puede estar asociado a un miembro.");
+  });
+});
+
 test("allows equal entity names in separate namespaces", async () => {
   await withApi(async (baseUrl) => {
     for (const namespace of ["acme.sales", "acme.support"]) {

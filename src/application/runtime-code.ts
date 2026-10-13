@@ -19,6 +19,7 @@ export interface BusinessContext {
   records: {
     count(entityName: string, namespace?: string): number;
     get(entityName: string, id: string, namespace?: string): EntityRecord | undefined;
+    findBy(entityName: string, field: string, value: unknown, namespace?: string): EntityRecord[];
     create(entityName: string, value: Record<string, unknown>, namespace?: string): Promise<EntityRecord>;
     update(entityName: string, id: string, changes: Record<string, unknown>, namespace?: string): Promise<EntityRecord>;
     remove(entityName: string, id: string, namespace?: string): Promise<void>;
@@ -26,6 +27,7 @@ export interface BusinessContext {
   collection(entityName: string, namespace?: string): {
     count(): number;
     get(id: string): EntityRecord | undefined;
+    findBy(field: string, value: unknown): EntityRecord[];
     create(value: Record<string, unknown>): Promise<EntityRecord>;
     update(id: string, changes: Record<string, unknown>): Promise<EntityRecord>;
     remove(id: string): Promise<void>;
@@ -93,6 +95,7 @@ function businessContext(context: EntityOperationContext): BusinessContext {
   const records = {
     count: (entityName: string, namespace?: string) => context.runtime.count(entityName, namespace),
     get: (entityName: string, id: string, namespace?: string) => context.runtime.findRecord(entityName, id, namespace),
+    findBy: (entityName: string, field: string, value: unknown, namespace?: string) => context.runtime.listRecords(entityName, namespace).filter((record) => record[field] === value),
     create: async (entityName: string, value: Record<string, unknown>, namespace?: string) => requiredRecord(await execute("create", entityName, namespace, undefined, value)),
     update: async (entityName: string, id: string, changes: Record<string, unknown>, namespace?: string) => requiredRecord(await execute("update", entityName, namespace, id, changes)),
     remove: async (entityName: string, id: string, namespace?: string) => { await execute("delete", entityName, namespace, id); }
@@ -107,6 +110,7 @@ function businessContext(context: EntityOperationContext): BusinessContext {
     collection: (entityName, namespace) => ({
       count: () => records.count(entityName, namespace),
       get: (id) => records.get(entityName, id, namespace),
+      findBy: (field, value) => records.findBy(entityName, field, value, namespace),
       create: (value) => records.create(entityName, value, namespace),
       update: (id, changes) => records.update(entityName, id, changes, namespace),
       remove: (id) => records.remove(entityName, id, namespace)

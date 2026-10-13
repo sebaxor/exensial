@@ -62,7 +62,7 @@ type Loan = {
 The installed TypeScript modules deliberately contain only library rules:
 
 - Books trim title, author, and ISBN; ISBN is uppercased. `copiesTotal` must be a positive integer. A new book starts with all copies available, and a total can never fall below copies currently borrowed.
-- Members trim names, lowercase email addresses, require a valid email, and become active on creation.
+- Members trim names, lowercase email addresses, require a valid email, and become active on creation. A user account can be associated with at most one member; create, update, and bulk import reject duplicate associations.
 - A loan requires a real active member, an available book, and a due date later than its borrow date. When `borrowedAt` is omitted, the domain module assigns the current server time. Creating it decrements `copiesAvailable`, forces `status` to `active`, and removes any caller-supplied `returnedAt`. If persistence fails, it restores the reserved copy.
 - A return is the only allowed update for an active loan: it must set `status: "returned"` and a valid `returnedAt`; it then releases one copy. Active loans cannot be deleted, and bulk loan creation is rejected.
 

@@ -180,6 +180,11 @@ export default {
 };`;
 
 const membersCode = String.raw`
+function assertUserIsAvailable(member, currentId, members, fail) {
+  if (!member.user) return;
+  const assigned = members.findBy("user", String(member.user)).find((other) => other.id !== currentId);
+  if (assigned) fail("library.members.error.userAlreadyAssigned", "A user can be associated with only one member");
+}
 function prepare(member, fail) {
   member.name = String(member.name ?? "").trim();
   member.email = String(member.email ?? "").trim().toLowerCase();
@@ -187,12 +192,22 @@ function prepare(member, fail) {
   member.active = true;
 }
 export default {
-  create: async (context, next) => { prepare(context.input, context.fail); await next(); },
-  bulkCreate: async (context, next) => { for (const member of context.input) prepare(member, context.fail); await next(); },
+  create: async (context, next) => { prepare(context.input, context.fail); assertUserIsAvailable(context.input, undefined, context.collection("members", "library"), context.fail); await next(); },
+  bulkCreate: async (context, next) => {
+    const users = new Set();
+    for (const member of context.input) {
+      prepare(member, context.fail);
+      assertUserIsAvailable(member, undefined, context.collection("members", "library"), context.fail);
+      if (member.user && users.has(String(member.user))) context.fail("library.members.error.userAlreadyAssigned", "A user can be associated with only one member");
+      if (member.user) users.add(String(member.user));
+    }
+    await next();
+  },
   update: async (context, next) => {
     const member = context.input;
     if ("name" in member) member.name = String(member.name).trim();
     if ("email" in member) { member.email = String(member.email).trim().toLowerCase(); if (!member.email.includes("@")) context.fail("library.members.error.validEmail", "A valid email is required"); }
+    if ("user" in member) assertUserIsAvailable(member, context.current.id, context.collection("members", "library"), context.fail);
     await next();
   }
 };`;
@@ -232,6 +247,7 @@ const domainErrorLocalizations = [
   ["library.books.error.copiesBelowBorrowed", "Total copies cannot be lower than borrowed copies", "El total de copias no puede ser menor que las copias prestadas."],
   ["library.members.error.requiredFields", "A name and valid email are required", "El nombre y un correo electrónico válido son obligatorios."],
   ["library.members.error.validEmail", "A valid email is required", "Se requiere un correo electrónico válido."],
+  ["library.members.error.userAlreadyAssigned", "A user can be associated with only one member", "Un usuario solo puede estar asociado a un miembro."],
   ["library.loans.error.requiredFields", "Book, member, and due date are required", "El libro, el miembro y la fecha límite son obligatorios."],
   ["library.loans.error.memberInactive", "Member is not active", "El miembro no está activo."],
   ["library.loans.error.bookUnavailable", "Book is not available", "El libro no está disponible."],

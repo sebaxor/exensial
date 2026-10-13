@@ -29,6 +29,7 @@ type BusinessContext = {
   records: {
     count(entityName: string, namespace?: string): number;
     get(entityName: string, id: string, namespace?: string): Record<string, unknown> | undefined;
+    findBy(entityName: string, field: string, value: unknown, namespace?: string): Array<Record<string, unknown>>;
     create(entityName: string, value: Record<string, unknown>, namespace?: string): Promise<Record<string, unknown>>;
     update(entityName: string, id: string, changes: Record<string, unknown>, namespace?: string): Promise<Record<string, unknown>>;
     remove(entityName: string, id: string, namespace?: string): Promise<void>;
@@ -36,6 +37,7 @@ type BusinessContext = {
   collection(entityName: string, namespace?: string): {
     count(): number;
     get(id: string): Record<string, unknown> | undefined;
+    findBy(field: string, value: unknown): Array<Record<string, unknown>>;
     create(value: Record<string, unknown>): Promise<Record<string, unknown>>;
     update(id: string, changes: Record<string, unknown>): Promise<Record<string, unknown>>;
     remove(id: string): Promise<void>;
@@ -45,7 +47,7 @@ type BusinessContext = {
 };
 ```
 
-`input` is mutable before `next()`, allowing normalization and derived fields. `current` is the persisted record for item operations. `collection("books", "library")` is the readable shorthand for working with one related collection; `records` is the equivalent lower-level form. Neither reveals persistence implementation. This is the seam that will later map to a table repository, a transaction, an event stream, or another persistence mechanism.
+`input` is mutable before `next()`, allowing normalization and derived fields. `current` is the persisted record for item operations. `collection("books", "library")` is the readable shorthand for working with one related collection; `records` is the equivalent lower-level form. `findBy(field, value)` is an equality lookup for rules such as unique associations; a future table repository can translate it to an indexed query. Neither exposes persistence implementation. This is the seam that will later map to a table repository, a transaction, an event stream, or another persistence mechanism.
 
 Because `input` is mutable, a domain module may also enforce ownership of workflow fields. For example, a loan's `create` operation can use `delete loan.returnedAt` and set `loan.status = "active"`; only its return transition may later set `returnedAt` during `update`.
 
