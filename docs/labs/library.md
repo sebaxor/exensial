@@ -87,7 +87,7 @@ npx tsx scripts/install-library-lab.ts http://localhost:3000
 npx tsx scripts/install-library-lab.ts --permissions http://localhost:3000
 ```
 
-The installer creates 100 books, 3 members, and 3 loans (two active and one returned). More than 25 books intentionally exercises the paginated advanced relation lookup in the Console.
+The installer creates 100 books, 24 members, and 3 loans (two active and one returned). More than 25 books and members intentionally exercise the paginated advanced relation lookups in the Console.
 
 ## Protected mode
 
@@ -98,7 +98,7 @@ The installer creates 100 books, 3 members, and 3 loans (two active and one retu
 | `reader` | `reader123` | Every `GET` endpoint. |
 | `admin` | `admin123` | Reads protected data and performs the administrative writes defined by the lab policy. |
 | `ana`, `mateo`, `sofia` | `member123` | Member accounts linked to the three seeded library members. |
-| anonymous | — | Public `GET /v1/library/books` catalog access. |
+| anonymous | — | Public catalog and book-query access. |
 
 Use `/console` for the metadata-driven UI or `/docs` for Swagger. The Console exposes a visible **Sign in** dialog, displays the active username and roles, sends the issued JWT as a Bearer token, and hides resources or CRUD controls that the active principal cannot use. Full policy, JWT, sensitive-field, and OpenAPI metadata details are in [Authentication and endpoint permissions](../security.md).
 

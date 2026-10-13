@@ -21,6 +21,8 @@ It accepts an OData-like subset:
 
 The response is a JSON array and carries `X-Total-Count`, `X-Query-Skip`, and `X-Query-Top` headers.
 
+When endpoint permissions are enabled, a query route is authorized by its own HTTP path. For example, grant `GET /v1/query/exensial/library/books*` to make the library-book lookup public, or `GET /v1/query/exensial/*` to an administrative role. A CRUD rule for `/v1/library/books*` does not implicitly cover the query capability.
+
 ```bash
 curl --get 'http://localhost:3000/v1/query/exensial/library/books' \
   --data-urlencode "\$filter=contains(title, 'sample') or contains(author, 'sample')" \

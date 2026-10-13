@@ -22,7 +22,7 @@ An authenticated user can read and update their own public profile at `GET` / `P
 3. If rules exist, a missing or invalid Bearer token returns `401` with `WWW-Authenticate: Bearer`.
 4. A signed-in user whose roles do not match an allow returns `403`. A matching deny also returns `403`.
 
-For example, the lab explicitly allows `anonymous` to `GET /v1/library/books*`, allows `library-reader` to `GET /v1/*`, and adds administrative write rules separately. This keeps the catalog public without accidentally making every route matched by the broad reader rule require a token.
+For example, the lab explicitly allows `anonymous` to `GET /v1/library/books*` and its public ExensialQuery route, allows `library-reader` to `GET /v1/*`, and adds administrative write and query rules separately. Query endpoints have their own `/v1/query/exensial/...` paths, so a restrictive policy must grant them explicitly. This keeps the catalog public without accidentally making every route matched by the broad reader rule require a token.
 
 ## Library lab with permissions
 
