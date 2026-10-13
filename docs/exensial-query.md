@@ -44,4 +44,4 @@ type Book = {
 
 `searchable` permits text functions and equality. `filterable` permits equality and numeric comparisons. Unsupported fields, malformed filters, and inappropriate operators return `400`; filters are parsed and compiled to a repository predicate, never evaluated as JavaScript, SQL, or uploaded domain code.
 
-The Console uses this capability for relation fields with more than 25 records. It renders a search input only when the capability is advertised and the target entity marks fields searchable. Otherwise it preserves the plain CRUD-backed select.
+The Console uses this capability for relation fields with more than 25 records. It opens a dedicated lookup dialog with a result grid and one filter per searchable field, rather than embedding a large select in the create/edit form. The user explicitly selects one grid row. If the capability is unavailable or the target collection has 25 or fewer records, the Console preserves the plain CRUD-backed select.

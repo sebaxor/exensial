@@ -118,6 +118,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /openapi\.json/);
     assert.match(consolePage, /exensial\.lastConsoleRoute/);
     assert.match(consolePage, /hashchange/);
+    assert.match(consolePage, /lookup-dialog/);
+    assert.match(consolePage, /Filter/);
   });
 });
 
