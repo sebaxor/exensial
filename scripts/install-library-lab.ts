@@ -174,8 +174,8 @@ export default {
 };`;
 
 async function resetLibrary(): Promise<void> {
+  await signInIfPresent();
   if (withPermissions) {
-    await signInIfPresent();
     for (const entity of ["permissions", "users", "roles"]) {
       const records = await request("GET", `/v1/${entity}`) as Array<{ id: string }>;
       for (const record of records) await request("DELETE", `/v1/${entity}/${record.id}`);
