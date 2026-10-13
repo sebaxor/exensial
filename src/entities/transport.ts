@@ -5,8 +5,10 @@ export const transportModules: EntityModule[] = [
   {
     definition: {
       name: "requests",
+      context: { group: "System" },
+      documentation: { title: { en: "Request journal" }, description: { en: "Normalized inbound API requests captured for auditing and diagnostics." } },
       fields: {
-        apiVersion: { type: "string", required: true },
+        apiVersion: { type: "string", required: true, documentation: { title: { en: "API version" } } },
         receivedAt: { type: "string", required: true },
         namespace: { type: "string", required: false },
         entityName: { type: "string", required: true },
@@ -19,6 +21,8 @@ export const transportModules: EntityModule[] = [
   {
     definition: {
       name: "responses",
+      context: { group: "System" },
+      documentation: { title: { en: "Response journal" }, description: { en: "Normalized API responses with completion time and duration." } },
       fields: {
         status: { type: "number", required: true },
         completedAt: { type: "string", required: true },

@@ -7,6 +7,7 @@ import { compileRuntimeCode } from "../application/runtime-code";
 
 const definition = {
   name: "entities",
+  context: { group: "System" },
   documentation: {
     title: { en: "Entity catalog" },
     description: {

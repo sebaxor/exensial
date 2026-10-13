@@ -11,8 +11,13 @@ async function request(method: string, path: string, body?: unknown): Promise<an
   return data;
 }
 
-const booksDefinition = String.raw`type Book = {
-  /** @exensial.title en Title */
+const booksDefinition = String.raw`/**
+ * @exensial.title en Library books
+ * @exensial.description en Catalog records and copy availability for the library.
+ */
+type Book = {
+  /** @exensial.title en Title
+   * @exensial.description en The title shown to readers. */
   title: string;
   author: string;
   isbn: string;
@@ -25,14 +30,22 @@ const booksDefinition = String.raw`type Book = {
   copiesAvailable?: number;
 }`;
 
-const membersDefinition = String.raw`type Member = {
+const membersDefinition = String.raw`/**
+ * @exensial.title en Library members
+ * @exensial.description en People who can borrow books from the library.
+ */
+type Member = {
   name: string;
   /** @exensial.ui.control email */
   email: string;
   active?: boolean;
 }`;
 
-const loansDefinition = String.raw`type Loan = {
+const loansDefinition = String.raw`/**
+ * @exensial.title en Book loans
+ * @exensial.description en Circulation records for borrowed and returned books.
+ */
+type Loan = {
   /** @exensial.relation library/books label=title */
   book: Book;
   /** @exensial.relation library/members label=name */
@@ -131,11 +144,13 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "members", namespace: "library", group: "Library", definition: membersDefinition, code: membersCode });
   await request("POST", "/v1/entities", { name: "loans", namespace: "library", group: "Library", definition: loansDefinition, code: loansCode });
 
-  const books = (await request("POST", "/v1/library/books", [
+  const featuredBooks = [
     { title: "  The Left Hand of Darkness  ", author: " Ursula K. Le Guin ", isbn: "978-0441478125", copiesTotal: 2 },
     { title: "Kindred", author: "Octavia E. Butler", isbn: "978-0807083697", copiesTotal: 1 },
     { title: "The Dispossessed", author: "Ursula K. Le Guin", isbn: "978-0061054884", copiesTotal: 3 }
-  ])).items;
+  ];
+  const generatedBooks = Array.from({ length: 97 }, (_, index) => ({ title: `Library sample ${index + 4}`, author: `Sample author ${index + 1}`, isbn: `978-000${String(index + 4).padStart(6, "0")}`, copiesTotal: (index % 4) + 1 }));
+  const books = (await request("POST", "/v1/library/books", [...featuredBooks, ...generatedBooks])).items;
   const members = (await request("POST", "/v1/library/members", [
     { name: " Ana Torres ", email: " ANA.TORRES@EXAMPLE.COM " },
     { name: " Mateo Rios ", email: " MATEO.RIOS@EXAMPLE.COM " },
