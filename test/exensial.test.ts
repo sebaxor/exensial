@@ -137,7 +137,7 @@ test("persists normalized requests and responses as system entities", async () =
 
 test("generates localized OpenAPI documentation from Exensial JSDoc metadata", async () => {
   await withApi(async (baseUrl) => {
-    const definition = `/**\n * @exensial.title en Products\n * @exensial.title es Productos\n * @exensial.description en A product catalog\n */\ntype Product = {\n  /** @exensial.title en Title */\n  name: string;\n  /**\n   * @exensial.ui.hidden\n   */\n  internalCode?: string;\n  /**\n   * @exensial.ui.control money\n   */\n  price?: number;\n  /**\n   * @exensial.relation catalog/categories label=name\n   */\n  categoryId?: string;\n}`;
+    const definition = `/**\n * @exensial.title en Products\n * @exensial.title es Productos\n * @exensial.description en A product catalog\n * @exensial.operation list en List products\n * @exensial.operation list es Listar productos\n */\ntype Product = {\n  /** @exensial.title en Title */\n  name: string;\n  /**\n   * @exensial.ui.hidden\n   */\n  internalCode?: string;\n  /**\n   * @exensial.ui.control money\n   */\n  price?: number;\n  /**\n   * @exensial.relation catalog/categories label=name\n   */\n  categoryId?: string;\n}`;
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "documented-products", definition }) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.info.title, "Exensial API");
@@ -149,6 +149,7 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.equal(spanishOpenapi.paths["/v1/auth/login"].post.summary, "Crear una sesión JWT local");
     assert.match(spanishOpenapi.paths["/v1/auth/login"].post.description, /Valida un usuario local/);
     assert.match(spanishOpenapi.components.schemas.localizations.description, /Traducciones en tiempo de ejecución/);
+    assert.equal(spanishOpenapi.paths["/v1/documented-products"].get.summary, "Listar productos");
     assert.equal(openapi.components.schemas.entities.title, "Entity catalog");
     assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].control, "textarea");
     assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].tableHidden, true);

@@ -20,6 +20,7 @@ The stable metadata keys currently supported by generated OpenAPI and the Consol
 - `entity.<namespace.name-or-name>.description`
 - `entity.<namespace.name-or-name>.field.<field>.title`
 - `entity.<namespace.name-or-name>.field.<field>.description`
+- `entity.<namespace.name-or-name>.operation.<list|create|get|replace|update|delete|query>.summary`
 - `ui.<name>` for generic Console text, for example `ui.save`, `ui.cancel`, `ui.edit`, `ui.delete`, `ui.previous`, `ui.next`, `ui.signIn`, `ui.signOut`, `ui.guest`, and `ui.anonymous`
 
 For example, a book title field in `library/books` is addressed as `entity.library.books.field.title.title`.

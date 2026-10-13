@@ -10,7 +10,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
-  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
+  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...definitions.map((definition) => ({ ...entityPaths(definition, language, localizations), ...(capabilities.exensialQuery ? exensialQueryPaths(definition, language, localizations) : {}) })));
   if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? [], capabilities.roles ?? []);
   return {
     openapi: "3.0.4",
@@ -66,7 +66,7 @@ function authenticationPaths(language: string, localizations: LocalizationEntry[
   };
 }
 
-function exensialQueryPaths(definition: EntityDefinition): Record<string, unknown> {
+function exensialQueryPaths(definition: EntityDefinition, language: string, localizations: LocalizationEntry[]): Record<string, unknown> {
   const namespace = definition.context?.namespace;
   const path = `/v1/query/exensial/${namespace ? `${namespace}/` : ""}${definition.name}`;
   const reference = { $ref: `#/components/schemas/${schemaKey(definition)}` };
@@ -75,7 +75,7 @@ function exensialQueryPaths(definition: EntityDefinition): Record<string, unknow
       get: {
         tags: [schemaKey(definition), "ExensialQuery"],
         operationId: `query${identifier(schemaKey(definition))}`,
-        summary: `Query ${definition.name}`,
+        summary: operationSummary(definition, "query", language, localizations),
         description: "Uses the optional ExensialQuery capability. It is an OData-like, safe read-only subset; only fields annotated with @exensial.ui.searchable or @exensial.ui.filterable may be used in $filter.",
         parameters: [
           { name: "$filter", in: "query", description: "Examples: contains(title, 'Dune') or copiesAvailable gt 0. Clauses can be joined with and.", schema: { type: "string" } },
@@ -132,7 +132,7 @@ function scalarSchema(type: ScalarType): Schema {
   return { type };
 }
 
-function entityPaths(definition: EntityDefinition): Record<string, unknown> {
+function entityPaths(definition: EntityDefinition, language: string, localizations: LocalizationEntry[]): Record<string, unknown> {
   const reference = { $ref: `#/components/schemas/${schemaKey(definition)}` };
   const namespace = definition.context?.namespace;
   const collectionPath = `/v1/${namespace ? `${namespace}/` : ""}${definition.name}`;
@@ -143,10 +143,10 @@ function entityPaths(definition: EntityDefinition): Record<string, unknown> {
   const partialInput = partialExample(definition);
   return {
     [collectionPath]: {
-      get: operation(definition, "list", `List ${definition.name}`, "Returns every record currently held by this entity.", {
+      get: operation(definition, "list", language, localizations, {
         200: { description: "Collection returned", content: jsonContent({ type: "array", items: reference }, [record]) }
       }),
-      post: operation(definition, "create", `Create or import ${definition.name}`, "Send one object to create one record, or an array of objects to import records in bulk.", {
+      post: operation(definition, "create", language, localizations, {
         201: {
           description: "Record or bulk import created",
           content: jsonContent({ oneOf: [reference, { type: "object", properties: { items: { type: "array", items: reference } }, required: ["items"] }] }, record)
@@ -159,14 +159,14 @@ function entityPaths(definition: EntityDefinition): Record<string, unknown> {
     },
     [itemPath]: {
       parameters: [{ name: "id", in: "path", required: true, description: "Record identifier returned by a create operation.", schema: { type: "string", format: "uuid" }, example: exampleId() }],
-      get: operation(definition, "get", `Get ${definition.name}`, "Returns one record by id.", { 200: { description: "Record returned", content: jsonContent(reference, record) }, 404: errorResponse() }),
-      put: operation(definition, "replace", `Replace ${definition.name}`, "Replaces a record. Include every required field declared by the entity.", {
+      get: operation(definition, "get", language, localizations, { 200: { description: "Record returned", content: jsonContent(reference, record) }, 404: errorResponse() }),
+      put: operation(definition, "replace", language, localizations, {
         200: { description: "Record replaced", content: jsonContent(reference, record) }, 400: validationErrorResponse(), 404: errorResponse()
       }, jsonContent(reference, input)),
-      patch: operation(definition, "update", `Update ${definition.name}`, "Updates only the supplied fields; required fields may be omitted.", {
+      patch: operation(definition, "update", language, localizations, {
         200: { description: "Record updated", content: jsonContent(reference, { ...record, ...partialInput }) }, 400: validationErrorResponse(), 404: errorResponse()
       }, jsonContent(reference, partialInput)),
-      delete: operation(definition, "delete", `Delete ${definition.name}`, "Permanently removes one record by id.", { 204: { description: "Record deleted" }, 404: errorResponse() })
+      delete: operation(definition, "delete", language, localizations, { 204: { description: "Record deleted" }, 404: errorResponse() })
     }
   };
 }
@@ -174,19 +174,33 @@ function entityPaths(definition: EntityDefinition): Record<string, unknown> {
 function operation(
   definition: EntityDefinition,
   action: string,
-  summary: string,
-  detail: string,
+  language: string,
+  localizations: LocalizationEntry[],
   responses: Record<string | number, unknown>,
   requestContent?: Schema
 ): Schema {
   return {
     tags: [schemaKey(definition)],
     operationId: `${action}${identifier(schemaKey(definition))}`,
-    summary,
-    description: [text(definition.documentation?.description), detail].filter(Boolean).join("\n\n"),
+    summary: operationSummary(definition, action, language, localizations),
+    description: [localizedValue(localizations, language, `entity.${schemaKey(definition)}.description`, definition.documentation?.description), operationDetail(action, language)].filter(Boolean).join("\n\n"),
     ...(requestContent ? { requestBody: { required: true, content: requestContent } } : {}),
     responses
   };
+}
+
+function operationSummary(definition: EntityDefinition, action: string, language: string, localizations: LocalizationEntry[]): string {
+  const key = `entity.${schemaKey(definition)}.operation.${action}.summary`;
+  const configured = localizedValue(localizations, language, key, definition.documentation?.operations?.[action]);
+  if (configured) return configured;
+  const verb = language === "es" ? ({ list: "Listar", create: "Crear o importar", get: "Consultar", replace: "Reemplazar", update: "Actualizar", delete: "Eliminar", query: "Consultar" }[action] ?? action) : ({ list: "List", create: "Create or import", get: "Get", replace: "Replace", update: "Update", delete: "Delete", query: "Query" }[action] ?? action);
+  return `${verb} ${definition.name}`;
+}
+
+function operationDetail(action: string, language: string): string {
+  const spanish: Record<string, string> = { list: "Devuelve todos los registros almacenados actualmente por esta entidad.", create: "Envía un objeto para crear un registro o un arreglo de objetos para importarlos en bloque.", get: "Devuelve un registro por su id.", replace: "Reemplaza un registro. Incluye todos los campos requeridos declarados por la entidad.", update: "Actualiza únicamente los campos enviados; los campos requeridos pueden omitirse.", delete: "Elimina permanentemente un registro por su id." };
+  const english: Record<string, string> = { list: "Returns every record currently held by this entity.", create: "Send one object to create one record, or an array of objects to import records in bulk.", get: "Returns one record by id.", replace: "Replaces a record. Include every required field declared by the entity.", update: "Updates only the supplied fields; required fields may be omitted.", delete: "Permanently removes one record by id." };
+  return (language === "es" ? spanish : english)[action] ?? "";
 }
 
 function jsonContent(schema: Schema, example?: unknown): Schema {

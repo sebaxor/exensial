@@ -5,6 +5,8 @@ export type LocalizedText = Record<string, string>;
 export interface Documentation {
   title?: LocalizedText;
   description?: LocalizedText;
+  /** Localized OpenAPI summaries keyed by CRUD action, for example `list` or `update`. */
+  operations?: Record<string, LocalizedText>;
 }
 
 export type UiControl = "text" | "textarea" | "email" | "password" | "date" | "datetime" | "number" | "money" | "checkbox";

@@ -26,6 +26,20 @@ const booksDefinition = String.raw`/**
  * @exensial.title en Library books
  * @exensial.title es Libros
  * @exensial.description en Catalog records and copy availability for the library.
+ * @exensial.operation list en List books
+ * @exensial.operation list es Listar libros
+ * @exensial.operation create en Create or import books
+ * @exensial.operation create es Crear o importar libros
+ * @exensial.operation get en Get a book
+ * @exensial.operation get es Consultar un libro
+ * @exensial.operation replace en Replace a book
+ * @exensial.operation replace es Reemplazar un libro
+ * @exensial.operation update en Update a book
+ * @exensial.operation update es Actualizar un libro
+ * @exensial.operation delete en Delete a book
+ * @exensial.operation delete es Eliminar un libro
+ * @exensial.operation query en Query books
+ * @exensial.operation query es Consultar libros
  */
 type Book = {
   /** @exensial.title en Title
@@ -57,6 +71,20 @@ const membersDefinition = String.raw`/**
  * @exensial.title en Library members
  * @exensial.title es Miembros
  * @exensial.description en People who can borrow books from the library.
+ * @exensial.operation list en List members
+ * @exensial.operation list es Listar miembros
+ * @exensial.operation create en Create or import members
+ * @exensial.operation create es Crear o importar miembros
+ * @exensial.operation get en Get a member
+ * @exensial.operation get es Consultar un miembro
+ * @exensial.operation replace en Replace a member
+ * @exensial.operation replace es Reemplazar un miembro
+ * @exensial.operation update en Update a member
+ * @exensial.operation update es Actualizar un miembro
+ * @exensial.operation delete en Delete a member
+ * @exensial.operation delete es Eliminar un miembro
+ * @exensial.operation query en Query members
+ * @exensial.operation query es Consultar miembros
  */
 type Member = {
   /** @exensial.title en Name
@@ -81,6 +109,20 @@ const loansDefinition = String.raw`/**
  * @exensial.title en Book loans
  * @exensial.title es Préstamos
  * @exensial.description en Circulation records for borrowed and returned books.
+ * @exensial.operation list en List loans
+ * @exensial.operation list es Listar préstamos
+ * @exensial.operation create en Create or import loans
+ * @exensial.operation create es Crear o importar préstamos
+ * @exensial.operation get en Get a loan
+ * @exensial.operation get es Consultar un préstamo
+ * @exensial.operation replace en Replace a loan
+ * @exensial.operation replace es Reemplazar un préstamo
+ * @exensial.operation update en Update a loan
+ * @exensial.operation update es Actualizar un préstamo
+ * @exensial.operation delete en Delete a loan
+ * @exensial.operation delete es Eliminar un préstamo
+ * @exensial.operation query en Query loans
+ * @exensial.operation query es Consultar préstamos
  */
 type Loan = {
   /** @exensial.title en Book

@@ -89,6 +89,25 @@ type Task = {
 
 OpenAPI uses English by default in standard `title` and `description` properties and preserves every source locale in `x-exensial-localized`. `GET /openapi.json?lang=es` selects a matching JSDoc locale when present. The system `localizations` entity can override those generated labels at runtime; see [runtime localization](localization.md).
 
+Entity comments can also name each generated OpenAPI operation. This keeps endpoint summaries in the entity definition rather than in HTTP infrastructure:
+
+```ts
+/**
+ * @exensial.operation list en List tasks
+ * @exensial.operation list es Listar tareas
+ * @exensial.operation create en Create or import tasks
+ * @exensial.operation create es Crear o importar tareas
+ * @exensial.operation get es Consultar una tarea
+ * @exensial.operation replace es Reemplazar una tarea
+ * @exensial.operation update es Actualizar una tarea
+ * @exensial.operation delete es Eliminar una tarea
+ * @exensial.operation query es Consultar tareas
+ */
+type Task = { title: string };
+```
+
+The supported operation names are `list`, `create`, `get`, `replace`, `update`, `delete`, and `query`. A runtime override uses `entity.<namespace.name-or-name>.operation.<operation>.summary`.
+
 ## UI metadata and relations
 
 Field JSDoc can also declare presentation hints. Exensial exports them under the vendor extension `x-exensial-ui` in OpenAPI; consumers that do not understand the extension can safely ignore it.

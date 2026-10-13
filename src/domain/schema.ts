@@ -1,4 +1,4 @@
-import type { Documentation, FieldDefinition, FieldUi, ScalarType, UiControl } from "./entity";
+import type { Documentation, FieldDefinition, FieldUi, LocalizedText, ScalarType, UiControl } from "./entity";
 
 /** Parses the deliberately small TypeScript type-alias subset supported by Exensial. */
 export function parseEntitySource(source: string): { typeName: string; fields: Record<string, FieldDefinition>; documentation?: Documentation } {
@@ -62,12 +62,21 @@ function parseDocumentation(comment?: string): Documentation | undefined {
   if (!comment) return undefined;
   const documentation: Documentation = {};
   for (const line of comment.split("\n")) {
-    const tag = line.replace(/^\s*\*?\s*/, "").match(/^@exensial\.(title|description)\s+([\w-]+)\s+(.+)$/);
+    const content = line.replace(/^\s*\*?\s*/, "");
+    const operation = content.match(/^@exensial\.operation\s+(\w+)\s+([\w-]+)\s+(.+)$/);
+    if (operation) {
+      const [, action, locale, text] = operation;
+      documentation.operations ??= {};
+      documentation.operations[action] ??= {};
+      documentation.operations[action][locale] = text.trim();
+      continue;
+    }
+    const tag = content.match(/^@exensial\.(title|description)\s+([\w-]+)\s+(.+)$/);
     if (!tag) continue;
     const [, property, locale, text] = tag;
     const key = property as keyof Documentation;
     documentation[key] ??= {};
-    documentation[key]![locale] = text.trim();
+    (documentation[key] as LocalizedText)[locale] = text.trim();
   }
   return Object.keys(documentation).length ? documentation : undefined;
 }
