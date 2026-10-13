@@ -40,6 +40,28 @@ test("creates an entity from a TypeScript type and performs its CRUD", async () 
   });
 });
 
+test("bootstraps every system entity through the entity catalog", async () => {
+  await withApi(async (baseUrl) => {
+    const catalog = await (await fetch(`${baseUrl}/v1/entities?perPage=100`)).json() as Array<{ id: string; name: string; definition: string }>;
+    assert.deepEqual(new Set(catalog.map((item) => item.name)), new Set(["entities", "localizations", "requests", "responses", "roles", "users", "userRoles", "permissions"]));
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.equal(openapi.components.schemas.users.properties.active.default, true);
+    const catalogEntry = catalog.find((item) => item.name === "entities")!;
+    assert.equal((await fetch(`${baseUrl}/v1/entities/${catalogEntry.id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ definition: catalogEntry.definition })
+    })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/v1/entities`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "catalog-survives-update", definition: "type CatalogSurvivesUpdate = { name: string }" })
+    })).status, 201);
+    const created = await fetch(`${baseUrl}/v1/users`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: "defaulted", password: "password123", roles: [] })
+    });
+    assert.equal(created.status, 201);
+    assert.equal((await created.json()).active, true);
+  });
+});
+
 test("returns correct errors for duplicate entities and invalid record routes", async () => {
   await withApi(async (baseUrl) => {
     const entity = { name: "tasks", definition: "type Task = { title: string }" };

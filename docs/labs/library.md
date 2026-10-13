@@ -32,6 +32,7 @@ type Member = {
    * @exensial.ui.searchable
    */
   email: string;
+  /** @exensial.default true */
   active?: boolean;
 }
 

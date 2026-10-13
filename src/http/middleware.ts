@@ -205,7 +205,7 @@ export function requestRepositoryMiddleware(runtime: EntityRuntime): Middleware 
           ...(request.namespace ? { namespace: request.namespace } : {}),
           entityName: request.entityName,
           action: request.action,
-          ...(request.id ? { id: request.id } : {}),
+          ...(request.id ? { requestItemId: request.id } : {}),
           ...(request.payload ? { payload: request.payload } : {})
         }
       }

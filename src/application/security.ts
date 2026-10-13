@@ -1,18 +1,24 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { type EntityModule, type EntityRuntime, ValidationError } from "./entity-runtime";
+import { type EntityLifecycle, type EntityModule, type EntityRuntime, ValidationError } from "./entity-runtime";
+import type { EntityDefinitionRecord } from "../domain/entity";
 
 export class UnauthorizedError extends Error {}
 export class ForbiddenError extends Error {}
 
 export type SecurityPrincipal = { id: string; username: string; roles: string[] };
 
-/** System entities are regular runtime repositories; the HTTP policy layer reads them declaratively. */
-export const securityModules: EntityModule[] = [
-  { definition: { name: "roles", context: { version: "1.0.0", group: "System", icon: "shield,🛡" }, documentation: { title: { en: "Roles" }, description: { en: "Named collections of endpoint permissions." } }, fields: { name: { type: "string", required: true, documentation: { title: { en: "Role name" } }, ui: { searchable: true } }, description: { type: "string", required: false, documentation: { title: { en: "Description" } } } } } },
-  { definition: { name: "users", context: { version: "1.0.0", group: "System", icon: "user,👤" }, documentation: { title: { en: "Users" }, description: { en: "Local identities. Password hashes are never exposed through REST." } }, fields: { username: { type: "string", required: true, documentation: { title: { en: "Username" } }, ui: { searchable: true } }, email: { type: "string", required: false, documentation: { title: { en: "Email" } }, ui: { control: "email", searchable: true } }, password: { type: "string", required: false, documentation: { title: { en: "Initial password" } }, ui: { control: "password", sensitive: true } }, passwordHash: { type: "string", required: false, documentation: { title: { en: "Password hash" } }, ui: { hidden: true, sensitive: true } }, roles: { type: "json", required: true, documentation: { title: { en: "Legacy roles" } }, ui: { hidden: true } }, active: { type: "boolean", required: true, documentation: { title: { en: "Active" } } } } }, lifecycle: { beforeCreate(input) { preparePassword(input, true); }, beforeUpdate(_current, next) { preparePassword(next, false); } } },
-  { definition: { name: "userRoles", context: { version: "1.0.0", group: "System", icon: "users,👥" }, documentation: { title: { en: "User roles" }, description: { en: "Many-to-many assignments between users and roles." } }, fields: { user: { type: "string", required: true, documentation: { title: { en: "User" } }, ui: { relation: { entity: "users", label: "username" } } }, role: { type: "string", required: true, documentation: { title: { en: "Role" } }, ui: { relation: { entity: "roles", label: "name" } } } } } },
-  { definition: { name: "permissions", context: { version: "1.0.0", group: "System", icon: "key,🔑" }, documentation: { title: { en: "Endpoint permissions" }, description: { en: "Allow or deny a role access to an HTTP method and path. A path may end in * as a wildcard." } }, fields: { role: { type: "string", required: true, documentation: { title: { en: "Role" } }, ui: { relation: { entity: "roles", label: "name" } } }, method: { type: "string", required: true, documentation: { title: { en: "HTTP method" } }, ui: { searchable: true } }, path: { type: "string", required: true, documentation: { title: { en: "Path pattern" } }, ui: { searchable: true } }, effect: { type: "string", required: true, documentation: { title: { en: "Effect" }, description: { en: "allow or deny; deny takes precedence." } } } } } }
-];
+/**
+ * Only identity-specific cryptography remains infrastructure code. The `users`
+ * schema itself is a catalog record installed from system-definitions.ts.
+ */
+export function bindSecurityLifecycle(record: EntityDefinitionRecord, module: EntityModule): EntityModule {
+  if (record.name !== "users" || record.namespace) return module;
+  const lifecycle: EntityLifecycle = {
+    beforeCreate(input) { preparePassword(input, true); },
+    beforeUpdate(_current, next) { preparePassword(next, false); }
+  };
+  return { ...module, lifecycle };
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");

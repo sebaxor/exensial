@@ -27,8 +27,8 @@ HTTP adapter
 ```
 
 - The generic CRUD runtime owns validation, repositories, and the standard REST operations. It has no domain-specific names.
-- `requests`, `responses`, `localizations`, `users`, `roles`, and `permissions` are ordinary system entities using that same runtime. `passwordHash` is a sensitive field and is redacted at the HTTP representation boundary.
-- `entities` is another ordinary system entity. Its records are entity definitions; its lifecycle installs, replaces, or removes an entity in the runtime. It does not contain book, loan, or application-specific rules.
+- `requests`, `responses`, `localizations`, `users`, `roles`, and `permissions` are ordinary system entities using that same runtime. Their TypeScript definitions are seeded as records in `entities` during startup, then parsed and installed through the same definition path as application entities. `passwordHash` is a sensitive field and is redacted at the HTTP representation boundary.
+- `entities` is another ordinary system entity, and it also has its own record in the catalog. Its records are entity definitions; its lifecycle installs, replaces, or removes an entity in the runtime. It does not contain book, loan, or application-specific rules.
 - A dynamic entity can include TypeScript `code`, stored in its `entities` record and installed on top of generic CRUD. The library example is therefore runtime data, not production source code.
 
 The only fixed behavior above generic CRUD is the runtime-code compiler and its domain facade. It does not name or assume any business entity; it receives names such as `books` only from a runtime entity definition.
@@ -64,7 +64,7 @@ Requests and responses are stored through ordinary system entities, `requests` a
 
 The identity is `(namespace, name)`. The runtime uses that pair internally, which permits `acme.sales/orders` and `acme.support/orders` to coexist. The current repository is `InMemoryRepository`; changing persistence should retain the `Repository` contract and not affect routing or business behavior.
 
-The system `entities` module is itself an ordinary CRUD entity with extra lifecycle rules. Creating a definition validates its type alias and installs a new module. Updating a definition replaces its schema while retaining its repository. Deleting it removes the installed entity and its endpoint. The catalog is installed only when `EXENSIAL_ENABLE_ENTITY_CATALOG` is not `false`, or when `createApp({ enableEntityCatalog: true })` is used.
+The system `entities` module is itself an ordinary CRUD entity with extra lifecycle rules. Creating a definition validates its type alias and installs a new module. Updating a definition replaces its schema while retaining its repository. Deleting it removes the installed entity and its endpoint. At startup a deliberately small bootstrap installs the catalog reader, seeds the catalog's own definition plus the platform definitions, and materializes every system module from those records. The sole fixed system behavior is the password-hashing lifecycle attached to `users`; it is infrastructure rather than schema or domain configuration. The catalog is installed only when `EXENSIAL_ENABLE_ENTITY_CATALOG` is not `false`, or when `createApp({ enableEntityCatalog: true })` is used.
 
 ## Runtime business code
 

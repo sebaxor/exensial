@@ -46,6 +46,17 @@ export class EntityRuntime {
     return true;
   }
 
+  /**
+   * Inserts trusted startup data without invoking HTTP or catalog lifecycle.
+   * Bootstrap uses this only to materialize the catalog's own record and the
+   * built-in definition records before ordinary runtime operation begins.
+   */
+  seedRecord<T extends object>(entityName: string, data: T, namespace?: string): T & EntityRecord {
+    const entity = this.resolve(entityName, namespace);
+    if (!entity) throw new EntityNotFoundError("Entity not found");
+    return entity.repository.create(data as Omit<EntityRecord, "id">) as T & EntityRecord;
+  }
+
   replace(name: string, module: EntityModule, namespace?: string): void {
     const oldKey = entityKey(name, namespace, module.definition.context?.version);
     const newKey = entityKey(module.definition.name, module.definition.context?.namespace, module.definition.context?.version);

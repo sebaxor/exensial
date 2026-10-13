@@ -98,6 +98,7 @@ function parseUi(comment?: string): FieldUi | undefined {
   const ui: FieldUi = {};
   if (lines.some((line) => line === "@exensial.ui.hidden")) ui.hidden = true;
   if (lines.some((line) => line === "@exensial.ui.tableHidden")) ui.tableHidden = true;
+  if (lines.some((line) => line === "@exensial.ui.sensitive")) ui.sensitive = true;
   if (lines.some((line) => line === "@exensial.ui.searchable")) ui.searchable = true;
   if (lines.some((line) => line === "@exensial.ui.filterable")) ui.filterable = true;
   const control = lines.map((line) => line.match(/^@exensial\.ui\.control\s+(\w+)$/)).find(Boolean)?.[1];

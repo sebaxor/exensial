@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
-import { createEntitiesModule } from "./entities/entities";
-import { transportModules } from "./entities/transport";
-import { securityModules } from "./application/security";
+import { createEntitiesModule, entityCatalogRecord, moduleFromRecord } from "./entities/entities";
+import { systemDefinitionRecords } from "./entities/system-definitions";
+import { bindSecurityLifecycle } from "./application/security";
 import { authenticationMiddleware, authorizationMiddleware, compose, documentationMiddleware, entityLifecycleMiddleware, exensialQueryMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
 
 export interface AppOptions {
@@ -20,9 +20,19 @@ export function createApp({
   enableSecurity = process.env.EXENSIAL_ENABLE_SECURITY !== "false"
 }: AppOptions = {}) {
   const runtime = new EntityRuntime();
-  for (const module of transportModules) runtime.installIfMissing(module);
-  if (enableSecurity) for (const module of securityModules) runtime.installIfMissing(module);
-  if (enableEntityCatalog) runtime.installIfMissing(createEntitiesModule(runtime));
+  const binding = enableSecurity ? bindSecurityLifecycle : undefined;
+  const systemRecords = systemDefinitionRecords.filter((record) => enableSecurity || !["roles", "users", "userRoles", "permissions"].includes(record.name));
+  if (enableEntityCatalog) {
+    runtime.install(createEntitiesModule(runtime, binding));
+    runtime.seedRecord("entities", entityCatalogRecord);
+    for (const record of systemRecords) {
+      const persisted = runtime.seedRecord("entities", record);
+      runtime.install(moduleFromRecord(persisted, binding));
+    }
+  } else {
+    // Catalog-free mode keeps fixed startup modules but intentionally exposes no /entities route.
+    for (const record of systemRecords) runtime.install(moduleFromRecord(record as unknown as import("./domain/entity").EntityDefinitionRecord, binding));
+  }
   for (const module of modules) runtime.install(module);
   const handle = compose([
     httpAdapterMiddleware(),
