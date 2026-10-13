@@ -138,7 +138,9 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(openapi.info.description, /This creates a namespaced task collection/);
     assert.equal(openapi.components.schemas.entities.title, "Entity catalog");
     assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].control, "textarea");
+    assert.equal(openapi.components.schemas.entities.properties.definition["x-exensial-ui"].tableHidden, true);
     assert.equal(openapi.components.schemas.entities.properties.code["x-exensial-ui"].control, "textarea");
+    assert.equal(openapi.components.schemas.entities.properties.code["x-exensial-ui"].tableHidden, true);
     assert.match(openapi.components.schemas.entities.properties.name.description, /Final route segment/);
     const schema = openapi.components.schemas["documented-products"];
     assert.equal(schema.title, "Products");

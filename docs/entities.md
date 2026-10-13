@@ -109,6 +109,7 @@ type Loan = {
 ```
 
 - `@exensial.ui.hidden` hides a field from generic consoles and tables. The record still contains it and the REST API remains unchanged.
+- `@exensial.ui.tableHidden` keeps a field out of collection tables while retaining it in the generic create/edit form and REST representation. Use it for large source or configuration fields such as an entity definition.
 - `@exensial.ui.control text|textarea|email|date|datetime|number|money|checkbox` selects a suitable editor. `email`, `date`, and `datetime` also use the standard OpenAPI `format` where applicable.
 - `@exensial.relation <entity>` or `@exensial.relation <namespace>/<entity> label=<field>` declares a record relationship. The generic console reads the target collection and renders a selector using `label`, then `name`, `title`, `email`, or `id`.
 

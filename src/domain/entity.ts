@@ -11,6 +11,8 @@ export type UiControl = "text" | "textarea" | "email" | "password" | "date" | "d
 
 export interface FieldUi {
   hidden?: boolean;
+  /** Excluded from generic collection tables, while retained in forms and REST representations. */
+  tableHidden?: boolean;
   /** Excluded from HTTP representations while remaining available to trusted server-side logic. */
   sensitive?: boolean;
   control?: UiControl;

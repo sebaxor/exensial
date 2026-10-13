@@ -38,3 +38,13 @@ Both Swagger and the Console expose a language selector, remember the selected l
 On a first visit, the Console uses the browser's configured locale (for example `es-CO` becomes `es`) unless `?lang=` is explicit. Later visits use the locale remembered in browser storage until the user changes it.
 
 When there is no matching runtime record, Exensial uses a matching JSDoc locale, then English, then the first available JSDoc text. This keeps existing entity definitions backward compatible.
+
+## Reprovisioning a lab
+
+Lab translations are ordinary `localizations` records installed by that lab's script. After changing the script, run the lab installer again to replace its fixture data and publish the new labels. For the protected library lab:
+
+```bash
+npm run lab:library:permissions
+```
+
+Reload the Console afterwards. Its language selector remains in browser storage, so select `es` once if an older browser session is still using English.

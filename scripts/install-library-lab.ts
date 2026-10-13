@@ -302,9 +302,32 @@ async function install(): Promise<void> {
     ,{ locale: "es", key: "entity.permissions.field.path.title", value: "Patrón de ruta" }
     ,{ locale: "es", key: "entity.permissions.field.effect.title", value: "Efecto" }
     ,{ locale: "es", key: "entity.entities.title", value: "Catálogo de entidades" }
+    ,{ locale: "es", key: "entity.entities.field.name.title", value: "Nombre de ruta" }
+    ,{ locale: "es", key: "entity.entities.field.version.title", value: "Versión de entidad" }
+    ,{ locale: "es", key: "entity.entities.field.definition.title", value: "Tipo TypeScript" }
+    ,{ locale: "es", key: "entity.entities.field.namespace.title", value: "Espacio de nombres" }
+    ,{ locale: "es", key: "entity.entities.field.group.title", value: "Grupo del menú" }
+    ,{ locale: "es", key: "entity.entities.field.icon.title", value: "Ícono del menú" }
+    ,{ locale: "es", key: "entity.entities.field.module.title", value: "Módulo de comportamiento confiable" }
+    ,{ locale: "es", key: "entity.entities.field.behavior.title", value: "Configuración de comportamiento" }
+    ,{ locale: "es", key: "entity.entities.field.logic.title", value: "Lógica de negocio declarativa" }
+    ,{ locale: "es", key: "entity.entities.field.code.title", value: "Módulo de dominio TypeScript" }
     ,{ locale: "es", key: "entity.localizations.title", value: "Catálogo de localizaciones" }
+    ,{ locale: "es", key: "entity.localizations.field.locale.title", value: "Idioma" }
+    ,{ locale: "es", key: "entity.localizations.field.key.title", value: "Clave" }
+    ,{ locale: "es", key: "entity.localizations.field.value.title", value: "Texto" }
     ,{ locale: "es", key: "entity.requests.title", value: "Registro de solicitudes" }
+    ,{ locale: "es", key: "entity.requests.field.apiVersion.title", value: "Versión de API" }
+    ,{ locale: "es", key: "entity.requests.field.receivedAt.title", value: "Recibida el" }
+    ,{ locale: "es", key: "entity.requests.field.namespace.title", value: "Espacio de nombres" }
+    ,{ locale: "es", key: "entity.requests.field.entityName.title", value: "Entidad" }
+    ,{ locale: "es", key: "entity.requests.field.action.title", value: "Operación" }
+    ,{ locale: "es", key: "entity.requests.field.payload.title", value: "Carga" }
     ,{ locale: "es", key: "entity.responses.title", value: "Registro de respuestas" }
+    ,{ locale: "es", key: "entity.responses.field.status.title", value: "Estado HTTP" }
+    ,{ locale: "es", key: "entity.responses.field.completedAt.title", value: "Completada el" }
+    ,{ locale: "es", key: "entity.responses.field.durationMs.title", value: "Duración (ms)" }
+    ,{ locale: "es", key: "entity.responses.field.body.title", value: "Respuesta" }
   ]);
 
   const featuredBooks = [
