@@ -35,6 +35,8 @@ GET /console?lang=es#/library.books
 
 Both Swagger and the Console expose a language selector, remember the selected locale in browser storage, and reload their generated OpenAPI document with that parameter. The Console reads selected `ui.*` records from `x-exensial-ui-localization`, so its own controls are translated along with entity menus and fields. The standard OpenAPI fields remain standard (`title`, `description`, and so on); Exensial also retains the complete source locale map under `x-exensial-localized` for clients that need it.
 
+The introductory guide rendered at the top of Swagger is bundled with Exensial and has English and Spanish variants. It follows `?lang=` too. A runtime `openapi.info.description` localization remains an explicit override when an installation needs its own guide.
+
 On a first visit, the Console uses the browser's configured locale (for example `es-CO` becomes `es`) unless `?lang=` is explicit. Later visits use the locale remembered in browser storage until the user changes it.
 
 When there is no matching runtime record, Exensial uses a matching JSDoc locale, then English, then the first available JSDoc text. This keeps existing entity definitions backward compatible.

@@ -17,7 +17,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
     info: {
       title: localizedValue(localizations, language, "openapi.info.title") ?? "Exensial API",
       version: highestEntityVersion(definitions),
-      description: localizedValue(localizations, language, "openapi.info.description") ?? entityCatalogGuide()
+      description: localizedValue(localizations, language, "openapi.info.description") ?? entityCatalogGuide(language)
     },
     "x-exensial-language": language,
     "x-exensial-locales": [...new Set(["en", ...localizations.map((entry) => entry.locale)])].sort(),
@@ -230,7 +230,82 @@ function highestEntityVersion(definitions: EntityDefinition[]): string {
   })[0] ?? "1.0.0";
 }
 
-function entityCatalogGuide(): string {
+function entityCatalogGuide(language: string): string {
+  if (language === "es") return `## Empieza aquí: define una colección y después crea registros
+
+Una **definición de entidad** describe qué campos JSON acepta una colección. No crea por sí sola un libro, una tarea ni otro registro. Envía la definición a **POST /v1/entities** y luego usa la ruta que Exensial crea para los registros reales.
+
+### 1. Define una entidad
+
+Esto crea una colección de tareas con espacio de nombres. El alias de tipo es una cadena porque es información enviada por HTTP.
+
+\`\`\`json
+{
+  "name": "tasks",
+  "namespace": "acme.work",
+  "definition": "type Task = { title: string; completed?: boolean }"
+}
+\`\`\`
+
+### 2. Crea y consulta registros
+
+Cuando la definición termine correctamente, crea un registro en la ruta de colección generada:
+
+\`\`\`text
+POST /v1/acme.work/tasks
+{ "title": "Preparar la demostración", "completed": false }
+
+201 Created
+{ "id": "<generated-id>", "title": "Preparar la demostración", "completed": false }
+\`\`\`
+
+Usa ese \`id\` devuelto con \`GET /v1/acme.work/tasks/{id}\`, \`PATCH /v1/acme.work/tasks/{id}\` o \`DELETE /v1/acme.work/tasks/{id}\`.
+
+### Cómo se elige una ruta
+
+| Definición | Ruta de colección | Ruta de elemento |
+| --- | --- | --- |
+| \`{ "name": "tasks" }\` | \`/v1/tasks\` | \`/v1/tasks/{id}\` |
+| \`{ "name": "tasks", "namespace": "acme.work" }\` | \`/v1/acme.work/tasks\` | \`/v1/acme.work/tasks/{id}\` |
+
+El espacio de nombres es opcional pero, cuando existe, siempre es el segmento inmediatamente posterior a la versión de API. El par espacio de nombres y nombre identifica una entidad, por lo que dos espacios de nombres pueden contener \`tasks\`.
+
+### Comportamiento CRUD
+
+- **GET de colección** lista registros.
+- **POST de colección con un objeto** crea un registro.
+- **POST de colección con un arreglo** importa varios registros.
+- **GET de elemento** consulta un registro por id.
+- **PUT de elemento** lo reemplaza y exige todos los campos requeridos.
+- **PATCH de elemento** cambia únicamente los campos enviados.
+- **DELETE de elemento** lo elimina y devuelve \`204 No Content\`.
+
+Las operaciones de abajo incluyen ejemplos de solicitudes y respuestas generados a partir de los campos actuales de cada entidad. Léelos como la estructura exacta que acepta el esquema activo.
+
+### Documentación y localización
+
+Agrega JSDoc con \`@exensial.title <locale> <text>\` y \`@exensial.description <locale> <text>\` antes del tipo o de un campo. Swagger usa inglés cuando está disponible y conserva todos los idiomas en \`x-exensial-localized\`.
+
+\`\`\`ts
+/**
+ * @exensial.title en Tasks
+ * @exensial.title es Tareas
+ * @exensial.description en Work tracked by a team
+ */
+type Task = {
+  /** @exensial.description en A concise task summary */
+  title: string;
+  completed?: boolean;
+}
+\`\`\`
+
+### Lógica de negocio en tiempo de ejecución
+
+Usa el objeto opcional \`logic\` en la misma solicitud que crea una entidad. Es una definición de negocio de alto nivel recibida e instalada por HTTP; no es una selección de módulo del servidor ni JavaScript cargado desde el cliente.
+
+Cada acción CRUD puede declarar reglas \`before\`, \`after\` y \`onError\`. Las reglas disponibles son \`assert\`, \`assertDateOrder\`, \`lookup\`, \`set\`, \`patch\` y \`reject\`. Pueden validar DTOs, consultar una entidad relacionada, asignar un valor calculado, actualizar un registro relacionado o rechazar una operación.
+
+Por ejemplo, las reglas de creación de un préstamo pueden consultar su libro, exigir \`book.available === true\`, asignar el estado \`active\` y actualizar el libro a \`available: false\`. Las reglas de devolución pueden exigir \`status: "returned"\` y una fecha, y luego liberar el libro cuando la actualización del préstamo sea exitosa. Consulta la guía de creación de entidades para la definición JSON completa.`;
   return `## Start here: define a collection, then create records
 
 An **entity definition** describes which JSON fields a collection accepts. It does not create a book, task, or other record by itself. Send the definition to **POST /v1/entities**, then use the route that Exensial creates for the actual records.
