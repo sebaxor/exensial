@@ -3,19 +3,21 @@ import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
 import { EntityBehaviorRegistry, type EntityBehaviorModule } from "./application/entity-behaviors";
 import { createEntitiesModule } from "./entities/entities";
 import { transportModules } from "./entities/transport";
-import { compose, documentationMiddleware, entityLifecycleMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
+import { compose, documentationMiddleware, entityLifecycleMiddleware, exensialQueryMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
 
 export interface AppOptions {
   modules?: EntityModule[];
   behaviorModules?: EntityBehaviorModule[];
   enableEntityCatalog?: boolean;
+  enableExensialQuery?: boolean;
 }
 
 /** Creates the HTTP app with the system entity and any code-defined entity modules. */
 export function createApp({
   modules = [],
   behaviorModules = [],
-  enableEntityCatalog = process.env.EXENSIAL_ENABLE_ENTITY_CATALOG !== "false"
+  enableEntityCatalog = process.env.EXENSIAL_ENABLE_ENTITY_CATALOG !== "false",
+  enableExensialQuery = process.env.EXENSIAL_ENABLE_EXENSIAL_QUERY !== "false"
 }: AppOptions = {}) {
   const runtime = new EntityRuntime();
   const behaviors = new EntityBehaviorRegistry();
@@ -25,7 +27,8 @@ export function createApp({
   for (const module of modules) runtime.install(module);
   const handle = compose([
     httpAdapterMiddleware(),
-    documentationMiddleware(runtime),
+    documentationMiddleware(runtime, { exensialQuery: enableExensialQuery }),
+    exensialQueryMiddleware(runtime, enableExensialQuery),
     restPatternMiddleware(runtime),
     responseRepositoryMiddleware(runtime),
     payloadPatternMiddleware(runtime),

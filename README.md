@@ -58,6 +58,8 @@ The entity catalog is enabled by default. Run `EXENSIAL_ENABLE_ENTITY_CATALOG=fa
 
 Read [the entity authoring guide](docs/entities.md) for type syntax, localized JSDoc, namespaces, and business behavior. Read [the architecture](docs/architecture.md) for pipeline and design decisions.
 
+Optional technical capabilities are announced dynamically in OpenAPI. The current [ExensialQuery capability](docs/exensial-query.md) provides a safe, OData-like filtered read endpoint for metadata-driven clients.
+
 For a controlled local environment, [runtime TypeScript domain modules](docs/runtime-code.md) can also be installed through the entity endpoint. They receive a domain-oriented record API rather than HTTP or repository objects.
 
 Runtime domain examples are documented as independent [labs](docs/labs/README.md). Each lab contains compact domain definitions first and reproducible curls in its appendix.

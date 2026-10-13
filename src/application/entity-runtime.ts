@@ -80,6 +80,12 @@ export class EntityRuntime {
     return this.entities.get(entityKey(entityName, namespace))?.repository.count() ?? 0;
   }
 
+  query(entityName: string, predicate: (record: EntityRecord) => boolean, options: { skip: number; take: number }, namespace?: string): { items: EntityRecord[]; total: number } {
+    const entity = this.entities.get(entityKey(entityName, namespace));
+    if (!entity) throw new EntityNotFoundError("Entity not found");
+    return entity.repository.query({ predicate, ...options });
+  }
+
   async execute(request: DomainRequest, options: { createId?: string } = {}): Promise<EntityRecord | EntityRecord[] | undefined> {
     const entity = this.entities.get(entityKey(request.entityName, request.namespace));
     if (!entity) throw new EntityNotFoundError("Entity not found");

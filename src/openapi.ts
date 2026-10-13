@@ -3,9 +3,9 @@ import type { EntityDefinition, FieldDefinition, LocalizedText, ScalarType } fro
 type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
-export function createOpenApi(definitions: EntityDefinition[]): Record<string, unknown> {
+export function createOpenApi(definitions: EntityDefinition[], capabilities: { exensialQuery?: boolean } = {}): Record<string, unknown> {
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition)]));
-  const paths = Object.assign({}, ...definitions.map((definition) => entityPaths(definition)));
+  const paths = Object.assign({}, ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
   return {
     openapi: "3.0.4",
     info: {
@@ -13,8 +13,42 @@ export function createOpenApi(definitions: EntityDefinition[]): Record<string, u
       version: "1.0.0",
       description: entityCatalogGuide()
     },
+    "x-exensial-capabilities": capabilities.exensialQuery ? {
+      query: {
+        exensialQuery: {
+          root: "/v1/query/exensial",
+          description: "Optional OData-like read capability. Supports $filter (contains, startswith, endswith, eq, ne, gt, ge, lt, le joined with and), $skip, and $top. Only fields annotated as searchable or filterable can be queried."
+        }
+      }
+    } : {},
     paths,
     components: { schemas }
+  };
+}
+
+function exensialQueryPaths(definition: EntityDefinition): Record<string, unknown> {
+  const namespace = definition.context?.namespace;
+  const path = `/v1/query/exensial/${namespace ? `${namespace}/` : ""}${definition.name}`;
+  const reference = { $ref: `#/components/schemas/${schemaKey(definition)}` };
+  return {
+    [path]: {
+      get: {
+        tags: [schemaKey(definition), "ExensialQuery"],
+        operationId: `query${identifier(schemaKey(definition))}`,
+        summary: `Query ${definition.name}`,
+        description: "Uses the optional ExensialQuery capability. It is an OData-like, safe read-only subset; only fields annotated with @exensial.ui.searchable or @exensial.ui.filterable may be used in $filter.",
+        parameters: [
+          { name: "$filter", in: "query", description: "Examples: contains(title, 'Dune') or copiesAvailable gt 0. Clauses can be joined with and.", schema: { type: "string" } },
+          { name: "$skip", in: "query", description: "Number of matching records to omit. Defaults to 0.", schema: { type: "integer", minimum: 0, default: 0 } },
+          { name: "$top", in: "query", description: "Maximum matching records to return. Defaults to 25; maximum 100.", schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }
+        ],
+        responses: {
+          200: { description: "Matching records returned. X-Total-Count is the total before paging.", headers: { "X-Total-Count": { schema: { type: "integer" } }, "X-Query-Skip": { schema: { type: "integer" } }, "X-Query-Top": { schema: { type: "integer" } } }, content: jsonContent({ type: "array", items: reference }) },
+          400: validationErrorResponse(),
+          404: errorResponse()
+        }
+      }
+    }
   };
 }
 

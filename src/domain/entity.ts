@@ -12,6 +12,10 @@ export type UiControl = "text" | "textarea" | "email" | "date" | "datetime" | "n
 export interface FieldUi {
   hidden?: boolean;
   control?: UiControl;
+  /** Allows text search operators in optional query capabilities. */
+  searchable?: boolean;
+  /** Allows equality and comparison filters in optional query capabilities. */
+  filterable?: boolean;
   relation?: { entity: string; namespace?: string; label?: string };
 }
 

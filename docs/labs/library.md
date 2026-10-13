@@ -6,17 +6,25 @@ This is an independent runtime application: `library/books` owns catalog copies,
 
 ```ts
 type Book = {
-  /** @exensial.title en Title */
+  /** @exensial.title en Title
+   * @exensial.ui.searchable */
   title: string;
-  author: string;
-  isbn: string;
+  /** @exensial.ui.searchable */ author: string;
+  /** @exensial.ui.searchable */ isbn: string;
   /** @exensial.ui.control number */
   copiesTotal: number;
   /** @exensial.title en Available copies */
   /** @exensial.ui.control number */
   copiesAvailable?: number;
 }
-type Member = { name: string; /** @exensial.ui.control email */ email: string; active?: boolean }
+type Member = {
+  /** @exensial.ui.searchable */
+  name: string;
+  /** @exensial.ui.control email
+   * @exensial.ui.searchable */
+  email: string;
+  active?: boolean;
+}
 type Loan = {
   /** @exensial.relation library/books label=title */
   book: Book;
@@ -95,3 +103,5 @@ npx tsx scripts/install-library-lab.ts http://localhost:3000
 ```
 
 After installation, use `/console` for the metadata-driven CRUD UI or `/docs` for Swagger. See [runtime TypeScript domain modules](../runtime-code.md) for the runtime `code` contract.
+
+There are 100 books, so the loan editor demonstrates the advanced relation lookup. Its book search is driven by the optional [ExensialQuery capability](../exensial-query.md), discovered from OpenAPI; it searches the fields marked `@exensial.ui.searchable` rather than loading every book into a select.

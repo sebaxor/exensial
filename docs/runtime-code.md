@@ -95,6 +95,6 @@ Today Exensial uses Node's VM API only to load a module without injecting Node g
 
 Today each `records.*` call delegates to the in-memory runtime, so multi-entity changes are not atomic. The important preserved boundary is that domain code calls the `records` facade instead of an `InMemoryRepository`. When repositories become tables, the facade can run inside one database transaction and map entity definitions to tables without changing domain source.
 
-`count()` is available on `records` and on a bound `collection`. Arbitrary query execution is intentionally a TODO: the future API will accept a normalized query object (a string may be its initial transport representation), validate it, and compile it for the configured repository. Submitted query strings are never executed today.
+`count()` is available on `records` and on a bound `collection`. Runtime domain code deliberately does not receive arbitrary query execution. Read query engines are HTTP capabilities that validate and compile their syntax at the transport boundary before calling the repository; submitted query text is never executed as code.
 
 Declarative `logic` remains supported for compact, portable rules. Runtime `code` is the escape hatch for domain workflows that do not yet fit that vocabulary.

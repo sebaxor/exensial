@@ -119,6 +119,26 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
   });
 });
 
+test("advertises and executes the optional ExensialQuery capability", async () => {
+  await withApi(async (baseUrl) => {
+    const definition = `type Book = { /** @exensial.ui.searchable */ title: string; /** @exensial.ui.searchable */ author: string; /** @exensial.ui.filterable */ copies: number }`;
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "books", namespace: "library", definition }) });
+    await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify([{ title: "Dune", author: "Frank Herbert", copies: 2 }, { title: "Kindred", author: "Octavia Butler", copies: 1 }]) });
+    const queried = await fetch(`${baseUrl}/v1/query/exensial/library/books?$filter=contains(title,%20'Dune')%20or%20contains(author,%20'Butler')&$top=1`);
+    assert.equal(queried.status, 200);
+    assert.equal(queried.headers.get("x-total-count"), "2");
+    assert.equal((await queried.json()).length, 1);
+    assert.equal((await fetch(`${baseUrl}/v1/query/exensial/library/books?$filter=contains(copies,%20'2')`)).status, 400);
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.equal(openapi["x-exensial-capabilities"].query.exensialQuery.root, "/v1/query/exensial");
+    assert.ok(openapi.paths["/v1/query/exensial/library/books"]);
+  });
+  await withApi(async (baseUrl) => {
+    assert.equal((await fetch(`${baseUrl}/openapi.json`)).status, 200);
+    assert.equal((await fetch(`${baseUrl}/v1/query/exensial/entities`)).status, 404);
+  }, { enableExensialQuery: false });
+});
+
 test("binds trusted operation middleware to a runtime-defined entity", async () => {
   const normalizeTitle: EntityBehaviorModule = {
     id: "example/normalize-title",

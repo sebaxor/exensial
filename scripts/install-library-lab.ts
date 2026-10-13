@@ -17,9 +17,12 @@ const booksDefinition = String.raw`/**
  */
 type Book = {
   /** @exensial.title en Title
-   * @exensial.description en The title shown to readers. */
+   * @exensial.description en The title shown to readers.
+   * @exensial.ui.searchable */
   title: string;
+  /** @exensial.ui.searchable */
   author: string;
+  /** @exensial.ui.searchable */
   isbn: string;
   /** @exensial.ui.control number */
   copiesTotal: number;
@@ -35,8 +38,10 @@ const membersDefinition = String.raw`/**
  * @exensial.description en People who can borrow books from the library.
  */
 type Member = {
+  /** @exensial.ui.searchable */
   name: string;
-  /** @exensial.ui.control email */
+  /** @exensial.ui.control email
+   * @exensial.ui.searchable */
   email: string;
   active?: boolean;
 }`;

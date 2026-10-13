@@ -6,10 +6,20 @@ export interface Repository<T extends { id: string }> {
   findAll(): T[];
   findPage(page: number, perPage: number): T[];
   count(): number;
+  query(options: RepositoryQuery<T>): RepositoryQueryResult<T>;
   findById(id: string): T | undefined;
   update(id: string, changes: Partial<Omit<T, "id">>): T | undefined;
   delete(id: string): boolean;
 }
+
+/** A persistence-neutral read query. HTTP query engines compile into this shape. */
+export interface RepositoryQuery<T> {
+  predicate?: (record: T) => boolean;
+  skip?: number;
+  take?: number;
+}
+
+export interface RepositoryQueryResult<T> { items: T[]; total: number; }
 
 export class InMemoryRepository<T extends { id: string }> implements Repository<T> {
   private readonly items = new Map<string, T>();
@@ -26,6 +36,10 @@ export class InMemoryRepository<T extends { id: string }> implements Repository<
 
   findPage(page: number, perPage: number): T[] { return this.findAll().slice((page - 1) * perPage, page * perPage); }
   count(): number { return this.items.size; }
+  query({ predicate, skip = 0, take = 25 }: RepositoryQuery<T>): RepositoryQueryResult<T> {
+    const matched = predicate ? this.findAll().filter(predicate) : this.findAll();
+    return { total: matched.length, items: matched.slice(skip, skip + take) };
+  }
 
   findById(id: string): T | undefined {
     return this.items.get(id);

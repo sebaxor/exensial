@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
+import { compileExensialFilter } from "../application/exensial-query";
 import type { EntityRecord } from "../domain/entity";
 import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
 import type { DomainResponse } from "../domain/response";
@@ -47,11 +48,11 @@ export function httpAdapterMiddleware(): Middleware {
 }
 
 /** Serves generated API documentation without coupling the domain runtime to HTTP. */
-export function documentationMiddleware(runtime: EntityRuntime): Middleware {
+export function documentationMiddleware(runtime: EntityRuntime, options: { exensialQuery?: boolean } = {}): Middleware {
   return async (context, next) => {
     const pathname = new URL(requireHttpInput(context).url, "http://localhost").pathname;
     if (pathname === "/openapi.json") {
-      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions()) };
+      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(), options) };
       return;
     }
     if (pathname === "/docs") {
@@ -63,6 +64,28 @@ export function documentationMiddleware(runtime: EntityRuntime): Middleware {
       return;
     }
     await next();
+  };
+}
+
+/** Optional OData-like read engine. Its public availability is advertised in OpenAPI. */
+export function exensialQueryMiddleware(runtime: EntityRuntime, enabled = true): Middleware {
+  return async (context, next) => {
+    if (!enabled) return next();
+    const input = requireHttpInput(context);
+    const route = matchExensialQueryRoute(input.url, runtime);
+    if (!route) return next();
+    if (input.method !== "GET") throw new MethodNotAllowedError();
+    const url = new URL(input.url, "http://localhost");
+    const definition = runtime.definitions().find((item) => item.name === route.entityName && item.context?.namespace === route.namespace);
+    if (!definition) throw new EntityNotFoundError("Entity not found");
+    const skip = queryInteger(url.searchParams.get("$skip"), "$skip", 0, 0, 100_000);
+    const take = queryInteger(url.searchParams.get("$top"), "$top", 25, 1, 100);
+    const result = runtime.query(route.entityName, compileExensialFilter(url.searchParams.get("$filter"), definition), { skip, take }, route.namespace);
+    context.domainResponse = {
+      status: 200,
+      headers: { "X-Total-Count": String(result.total), "X-Query-Skip": String(skip), "X-Query-Top": String(take) },
+      body: result.items
+    };
   };
 }
 
@@ -220,6 +243,21 @@ function matchRoute(url: string, runtime: EntityRuntime): Pick<DomainRequest, "a
     return { apiVersion, namespace: parts[0], entityName: parts[1], id: parts[2] };
   }
   return undefined;
+}
+
+function matchExensialQueryRoute(url: string, runtime: EntityRuntime): Pick<DomainRequest, "apiVersion" | "namespace" | "entityName"> | undefined {
+  const segments = new URL(url, "http://localhost").pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  const [apiVersion, engine, capability, nameOrNamespace, maybeName, extra] = segments;
+  if (!apiVersion || !/^v\d+$/.test(apiVersion) || engine !== "query" || capability !== "exensial" || extra) return undefined;
+  if (maybeName && runtime.has(maybeName, nameOrNamespace)) return { apiVersion, namespace: nameOrNamespace, entityName: maybeName };
+  if (!maybeName && runtime.has(nameOrNamespace)) return { apiVersion, entityName: nameOrNamespace };
+  return undefined;
+}
+
+function queryInteger(raw: string | null, name: string, fallback: number, min: number, max: number): number {
+  const value = Number(raw ?? fallback);
+  if (!Number.isInteger(value) || value < min || value > max) throw new ValidationError(`${name} must be an integer between ${min} and ${max}`);
+  return value;
 }
 
 function actionFor(method: string, id?: string): CrudAction | undefined {
