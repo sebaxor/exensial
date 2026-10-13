@@ -208,7 +208,7 @@ test("binds trusted operation middleware to a runtime-defined entity", async () 
 
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.deepEqual(openapi.components.schemas["demo.content.announcements"]["x-exensial-context"], {
-      namespace: "demo.content", module: "example/normalize-title", operations: ["create", "list"]
+      namespace: "demo.content", version: "1.0.0", module: "example/normalize-title", operations: ["create", "list"]
     });
     assert.ok(openapi.paths["/v1/demo.content/announcements"]);
   }, { behaviorModules: [normalizeTitle] });

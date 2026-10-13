@@ -5,7 +5,7 @@ export const transportModules: EntityModule[] = [
   {
     definition: {
       name: "localizations",
-      context: { group: "System" },
+      context: { version: "1.0.0", group: "System" },
       documentation: { title: { en: "Localization catalog" }, description: { en: "Runtime translations for OpenAPI metadata and the generic console." } },
       fields: {
         locale: { type: "string", required: true, documentation: { title: { en: "Language" } }, ui: { searchable: true, filterable: true } },
@@ -17,7 +17,7 @@ export const transportModules: EntityModule[] = [
   {
     definition: {
       name: "requests",
-      context: { group: "System" },
+      context: { version: "1.0.0", group: "System" },
       documentation: { title: { en: "Request journal" }, description: { en: "Normalized inbound API requests captured for auditing and diagnostics." } },
       fields: {
         apiVersion: { type: "string", required: true, documentation: { title: { en: "API version" } } },
@@ -33,7 +33,7 @@ export const transportModules: EntityModule[] = [
   {
     definition: {
       name: "responses",
-      context: { group: "System" },
+      context: { version: "1.0.0", group: "System" },
       documentation: { title: { en: "Response journal" }, description: { en: "Normalized API responses with completion time and duration." } },
       fields: {
         status: { type: "number", required: true },

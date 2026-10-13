@@ -35,20 +35,20 @@ export class EntityRuntime {
   private readonly entities = new Map<string, ActiveEntity>();
 
   install(module: EntityModule): void {
-    const key = entityKey(module.definition.name, module.definition.context?.namespace);
+    const key = entityKey(module.definition.name, module.definition.context?.namespace, module.definition.context?.version);
     if (this.entities.has(key)) throw new EntityConflictError(`Entity already exists: ${key}`);
     this.entities.set(key, { ...module, repository: new InMemoryRepository<EntityRecord>() });
   }
 
   installIfMissing(module: EntityModule): boolean {
-    if (this.has(module.definition.name, module.definition.context?.namespace)) return false;
+    if (this.hasExact(module.definition.name, module.definition.context?.namespace, module.definition.context?.version)) return false;
     this.install(module);
     return true;
   }
 
   replace(name: string, module: EntityModule, namespace?: string): void {
-    const oldKey = entityKey(name, namespace);
-    const newKey = entityKey(module.definition.name, module.definition.context?.namespace);
+    const oldKey = entityKey(name, namespace, module.definition.context?.version);
+    const newKey = entityKey(module.definition.name, module.definition.context?.namespace, module.definition.context?.version);
     const current = this.entities.get(oldKey);
     if (!current) throw new EntityNotFoundError();
     if (oldKey !== newKey && this.entities.has(newKey)) throw new EntityConflictError(`Entity already exists: ${newKey}`);
@@ -56,40 +56,60 @@ export class EntityRuntime {
     this.entities.set(newKey, { ...module, repository: current.repository });
   }
 
-  remove(name: string, namespace?: string): void {
-    if (!this.entities.delete(entityKey(name, namespace))) throw new EntityNotFoundError();
+  remove(name: string, namespace?: string, version?: string): void {
+    if (!this.entities.delete(entityKey(name, namespace, version))) throw new EntityNotFoundError();
   }
 
-  has(name: string, namespace?: string): boolean { return this.entities.has(entityKey(name, namespace)); }
+  has(name: string, namespace?: string, apiVersion?: string): boolean { return Boolean(this.resolve(name, namespace, apiVersion)); }
+  hasExact(name: string, namespace?: string, version = "1.0.0"): boolean { return this.entities.has(entityKey(name, namespace, version)); }
 
-  definitions(): EntityDefinition[] {
-    return [...this.entities.values()].map(({ definition }) => definition);
+  definitions(apiVersion?: string): EntityDefinition[] {
+    if (!apiVersion) apiVersion = `v${this.latestMajor()}`;
+    const selected = new Map<string, EntityDefinition>();
+    for (const { definition } of this.entities.values()) {
+      if (major(definition.context?.version) !== apiVersion) continue;
+      const key = logicalKey(definition.name, definition.context?.namespace);
+      const existing = selected.get(key);
+      if (!existing || compareVersion(definition.context?.version, existing.context?.version) > 0) selected.set(key, definition);
+    }
+    return [...selected.values()];
   }
 
-  assertRecord(entityName: string, id?: string, namespace?: string): void {
-    const entity = this.entities.get(entityKey(entityName, namespace));
+  assertRecord(entityName: string, id?: string, namespace?: string, apiVersion?: string): void {
+    const entity = this.resolve(entityName, namespace, apiVersion);
     if (!entity) throw new EntityNotFoundError("Entity not found");
     this.requireRecord(entity, id);
   }
 
   findRecord(entityName: string, id: string, namespace?: string): EntityRecord | undefined {
-    return this.entities.get(entityKey(entityName, namespace))?.repository.findById(id);
+    return this.resolve(entityName, namespace)?.repository.findById(id);
   }
 
-  count(entityName: string, namespace?: string): number {
-    return this.entities.get(entityKey(entityName, namespace))?.repository.count() ?? 0;
+  count(entityName: string, namespace?: string, apiVersion?: string): number {
+    return this.resolve(entityName, namespace, apiVersion)?.repository.count() ?? 0;
   }
 
   listRecords(entityName: string, namespace?: string): EntityRecord[] {
-    const entity = this.entities.get(entityKey(entityName, namespace));
+    const entity = this.resolve(entityName, namespace);
     if (!entity) throw new EntityNotFoundError("Entity not found");
     return entity.repository.query({ take: 100_000 }).items;
   }
 
-  query(entityName: string, predicate: (record: EntityRecord) => boolean, options: { skip: number; take: number }, namespace?: string): { items: EntityRecord[]; total: number } {
-    const entity = this.entities.get(entityKey(entityName, namespace));
+  query(entityName: string, predicate: (record: EntityRecord) => boolean, options: { skip: number; take: number }, namespace?: string, apiVersion?: string): { items: EntityRecord[]; total: number } {
+    const entity = this.resolve(entityName, namespace, apiVersion);
     if (!entity) throw new EntityNotFoundError("Entity not found");
     return entity.repository.query({ predicate, ...options });
+  }
+
+  latestMajor(): number {
+    return Math.max(1, ...[...this.entities.values()].map(({ definition }) => Number(major(definition.context?.version).slice(1))));
+  }
+
+  private resolve(name: string, namespace?: string, apiVersion?: string): ActiveEntity | undefined {
+    const target = apiVersion ?? `v${this.latestMajor()}`;
+    return [...this.entities.values()]
+      .filter(({ definition }) => definition.name === name && definition.context?.namespace === namespace && major(definition.context?.version) === target)
+      .sort((a, b) => compareVersion(b.definition.context?.version, a.definition.context?.version))[0];
   }
 
   async execute(request: DomainRequest, options: { createId?: string } = {}): Promise<EntityRecord | EntityRecord[] | undefined> {
@@ -175,9 +195,12 @@ export class EntityRuntime {
   }
 }
 
-function entityKey(name: string, namespace?: string): string {
-  return namespace ? `${namespace}/${name}` : name;
+function entityKey(name: string, namespace?: string, version = "1.0.0"): string {
+  return `${namespace ? `${namespace}/` : ""}${name}@${version}`;
 }
+function logicalKey(name: string, namespace?: string): string { return namespace ? `${namespace}/${name}` : name; }
+function major(version = "1.0.0"): string { const match = version.match(/^(\d+)\.\d+\.\d+$/); if (!match) throw new ValidationError(`Invalid semantic version: ${version}`); return `v${match[1]}`; }
+function compareVersion(left = "1.0.0", right = "1.0.0"): number { const a = left.split(".").map(Number), b = right.split(".").map(Number); return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; }
 
 function operationMiddleware(entity: ActiveEntity, action: DomainRequest["action"]): EntityOperationMiddleware[] {
   const middleware = entity.operations?.[action];

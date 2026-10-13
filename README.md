@@ -62,6 +62,8 @@ Optional technical capabilities are announced dynamically in OpenAPI. The curren
 
 [Runtime localization](docs/localization.md) is a system entity that can override generated OpenAPI and Console labels per language without redeploying entity code.
 
+[Entity versioning](docs/versioning.md) maps semantic entity versions to `/vN` routes and generates OpenAPI per major version.
+
 For a controlled local environment, [runtime TypeScript domain modules](docs/runtime-code.md) can also be installed through the entity endpoint. They receive a domain-oriented record API rather than HTTP or repository objects.
 
 Runtime domain examples are documented as independent [labs](docs/labs/README.md). Each lab contains compact domain definitions first and reproducible curls in its appendix.

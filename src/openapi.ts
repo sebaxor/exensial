@@ -15,7 +15,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
     openapi: "3.0.4",
     info: {
       title: localizedValue(localizations, language, "openapi.info.title") ?? "Exensial API",
-      version: "1.0.0",
+      version: highestEntityVersion(definitions),
       description: localizedValue(localizations, language, "openapi.info.description") ?? entityCatalogGuide()
     },
     "x-exensial-language": language,
@@ -193,6 +193,12 @@ function fieldExample(name: string, field: FieldDefinition, index: number): unkn
 }
 
 function exampleId(): string { return "550e8400-e29b-41d4-a716-446655440000"; }
+function highestEntityVersion(definitions: EntityDefinition[]): string {
+  return definitions.map((definition) => definition.context?.version ?? "1.0.0").sort((left, right) => {
+    const a = left.split(".").map(Number), b = right.split(".").map(Number);
+    return b[0] - a[0] || b[1] - a[1] || b[2] - a[2];
+  })[0] ?? "1.0.0";
+}
 
 function entityCatalogGuide(): string {
   return `## Start here: define a collection, then create records

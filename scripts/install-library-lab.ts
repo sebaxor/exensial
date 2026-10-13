@@ -175,9 +175,9 @@ async function resetLibrary(): Promise<void> {
 
 async function install(): Promise<void> {
   await resetLibrary();
-  await request("POST", "/v1/entities", { name: "books", namespace: "library", group: "Library", definition: booksDefinition, code: booksCode });
-  await request("POST", "/v1/entities", { name: "members", namespace: "library", group: "Library", definition: membersDefinition, code: membersCode });
-  await request("POST", "/v1/entities", { name: "loans", namespace: "library", group: "Library", definition: loansDefinition, code: loansCode });
+  await request("POST", "/v1/entities", { name: "books", version: "1.0.0", namespace: "library", group: "Library", definition: booksDefinition, code: booksCode });
+  await request("POST", "/v1/entities", { name: "members", version: "1.0.0", namespace: "library", group: "Library", definition: membersDefinition, code: membersCode });
+  await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", definition: loansDefinition, code: loansCode });
   await request("POST", "/v1/localizations", [
     { locale: "es", key: "ui.consoleHint", value: "Consola de entidades en tiempo de ejecución" },
     { locale: "es", key: "ui.language", value: "Idioma" },

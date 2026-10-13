@@ -54,9 +54,10 @@ export function documentationMiddleware(runtime: EntityRuntime, options: { exens
     const url = new URL(requireHttpInput(context).url, "http://localhost");
     const pathname = url.pathname;
     const language = url.searchParams.get("lang") || "en";
+    const apiVersion = `v${Number(url.searchParams.get("version") ?? runtime.latestMajor())}`;
     const localizations = runtime.listRecords("localizations").map(({ locale, key, value }) => ({ locale, key, value })) as LocalizationEntry[];
     if (pathname === "/openapi.json") {
-      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(), { ...options, language, localizations }) };
+      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(apiVersion), { ...options, language, localizations }) };
       return;
     }
     if (pathname === "/docs") {
@@ -80,11 +81,11 @@ export function exensialQueryMiddleware(runtime: EntityRuntime, enabled = true):
     if (!route) return next();
     if (input.method !== "GET") throw new MethodNotAllowedError();
     const url = new URL(input.url, "http://localhost");
-    const definition = runtime.definitions().find((item) => item.name === route.entityName && item.context?.namespace === route.namespace);
+    const definition = runtime.definitions(route.apiVersion).find((item) => item.name === route.entityName && item.context?.namespace === route.namespace);
     if (!definition) throw new EntityNotFoundError("Entity not found");
     const skip = queryInteger(url.searchParams.get("$skip"), "$skip", 0, 0, 100_000);
     const take = queryInteger(url.searchParams.get("$top"), "$top", 25, 1, 100);
-    const result = runtime.query(route.entityName, compileExensialFilter(url.searchParams.get("$filter"), definition), { skip, take }, route.namespace);
+    const result = runtime.query(route.entityName, compileExensialFilter(url.searchParams.get("$filter"), definition), { skip, take }, route.namespace, route.apiVersion);
     context.domainResponse = {
       status: 200,
       headers: { "X-Total-Count": String(result.total), "X-Query-Skip": String(skip), "X-Query-Top": String(take) },
@@ -112,7 +113,7 @@ export function payloadPatternMiddleware(runtime: EntityRuntime): Middleware {
     const domainRequest = context.domainRequest;
     if (!domainRequest || !requiresBody(domainRequest.action)) return next();
     if (domainRequest.action === "update" || domainRequest.action === "replace") {
-      runtime.assertRecord(domainRequest.entityName, domainRequest.id, domainRequest.namespace);
+      runtime.assertRecord(domainRequest.entityName, domainRequest.id, domainRequest.namespace, domainRequest.apiVersion);
     }
     const rawBody = requireHttpInput(context).body;
     const payload = capturePayload(rawBody === undefined ? undefined : parseJson(rawBody));
@@ -202,7 +203,7 @@ function pagination(url: string): { page: number; perPage: number } {
 
 function paginationHeaders(context: RequestContext, runtime: EntityRuntime, request: DomainRequest): Record<string, string> {
   const { page, perPage } = request.pagination!;
-  const total = runtime.count(request.entityName, request.namespace);
+  const total = runtime.count(request.entityName, request.namespace, request.apiVersion);
   const url = new URL(requireHttpInput(context).url, "http://localhost");
   const link = (target: number, rel: string) => { const next = new URL(url); next.searchParams.set("page", String(target)); next.searchParams.set("perPage", String(perPage)); return `<${next.pathname}${next.search}>; rel="${rel}"`; };
   const links = [page > 1 ? link(1, "first") : "", page > 1 ? link(page - 1, "prev") : "", page * perPage < total ? link(page + 1, "next") : "", total ? link(Math.ceil(total / perPage), "last") : ""].filter(Boolean);
@@ -238,12 +239,12 @@ function matchRoute(url: string, runtime: EntityRuntime): Pick<DomainRequest, "a
   const segments = pathname.split("/").filter(Boolean).map(decodeURIComponent);
   const [apiVersion, ...parts] = segments;
   if (!apiVersion || !/^v\d+$/.test(apiVersion)) return undefined;
-  if (parts.length === 1 && runtime.has(parts[0])) return { apiVersion, entityName: parts[0] };
+  if (parts.length === 1 && runtime.has(parts[0], undefined, apiVersion)) return { apiVersion, entityName: parts[0] };
   if (parts.length === 2) {
-    if (runtime.has(parts[0])) return { apiVersion, entityName: parts[0], id: parts[1] };
-    if (runtime.has(parts[1], parts[0])) return { apiVersion, namespace: parts[0], entityName: parts[1] };
+    if (runtime.has(parts[0], undefined, apiVersion)) return { apiVersion, entityName: parts[0], id: parts[1] };
+    if (runtime.has(parts[1], parts[0], apiVersion)) return { apiVersion, namespace: parts[0], entityName: parts[1] };
   }
-  if (parts.length === 3 && runtime.has(parts[1], parts[0])) {
+  if (parts.length === 3 && runtime.has(parts[1], parts[0], apiVersion)) {
     return { apiVersion, namespace: parts[0], entityName: parts[1], id: parts[2] };
   }
   return undefined;
@@ -253,8 +254,8 @@ function matchExensialQueryRoute(url: string, runtime: EntityRuntime): Pick<Doma
   const segments = new URL(url, "http://localhost").pathname.split("/").filter(Boolean).map(decodeURIComponent);
   const [apiVersion, engine, capability, nameOrNamespace, maybeName, extra] = segments;
   if (!apiVersion || !/^v\d+$/.test(apiVersion) || engine !== "query" || capability !== "exensial" || extra) return undefined;
-  if (maybeName && runtime.has(maybeName, nameOrNamespace)) return { apiVersion, namespace: nameOrNamespace, entityName: maybeName };
-  if (!maybeName && runtime.has(nameOrNamespace)) return { apiVersion, entityName: nameOrNamespace };
+  if (maybeName && runtime.has(maybeName, nameOrNamespace, apiVersion)) return { apiVersion, namespace: nameOrNamespace, entityName: maybeName };
+  if (!maybeName && runtime.has(nameOrNamespace, undefined, apiVersion)) return { apiVersion, entityName: nameOrNamespace };
   return undefined;
 }
 
