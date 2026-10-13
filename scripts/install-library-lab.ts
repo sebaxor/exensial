@@ -256,6 +256,7 @@ async function install(): Promise<void> {
     { locale: "es", key: "ui.filter", value: "Filtrar" },
     { locale: "es", key: "ui.matchingRecords", value: "registros coincidentes" },
     { locale: "es", key: "ui.noRecords", value: "Aún no hay registros." },
+    { locale: "es", key: "ui.noEntities", value: "No hay entidades instaladas." },
     { locale: "es", key: "ui.noMatches", value: "No hay registros coincidentes." },
     { locale: "es", key: "ui.find", value: "Buscar" },
     { locale: "es", key: "ui.noRecordSelected", value: "No se ha seleccionado un registro" },

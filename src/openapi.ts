@@ -4,14 +4,14 @@ import { localizedValue, type LocalizationEntry } from "./application/localizati
 type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
-export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; permissions?: Array<Record<string, unknown>>; language?: string; localizations?: LocalizationEntry[]; }
+export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; permissions?: Array<Record<string, unknown>>; roles?: Array<Record<string, unknown>>; language?: string; localizations?: LocalizationEntry[]; }
 
 export function createOpenApi(definitions: EntityDefinition[], capabilities: OpenApiOptions = {}): Record<string, unknown> {
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
   const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths()] : []), ...definitions.map((definition) => ({ ...entityPaths(definition), ...(capabilities.exensialQuery ? exensialQueryPaths(definition) : {}) })));
-  if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? []);
+  if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? [], capabilities.roles ?? []);
   return {
     openapi: "3.0.4",
     info: {
@@ -37,14 +37,15 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
   };
 }
 
-function applyAuthorizationMetadata(paths: Record<string, unknown>, permissions: Array<Record<string, unknown>>): void {
+function applyAuthorizationMetadata(paths: Record<string, unknown>, permissions: Array<Record<string, unknown>>, roles: Array<Record<string, unknown>>): void {
+  const roleName = (value: unknown) => String(roles.find((role) => role.id === value)?.name ?? value);
   for (const [path, item] of Object.entries(paths)) {
     for (const [method, operation] of Object.entries(item as Record<string, unknown>)) {
       if (!/^(get|post|put|patch|delete)$/i.test(method) || !operation || typeof operation !== "object") continue;
       const rules = permissions.filter((permission) => (String(permission.method) === "*" || String(permission.method).toUpperCase() === method.toUpperCase()) && matchesPath(String(permission.path), path));
       if (!rules.length) continue;
-      const metadata = rules.map(({ role, effect, method: ruleMethod, path: rulePath }) => ({ role, effect, method: ruleMethod, path: rulePath }));
-      const anonymous = rules.some((rule) => rule.role === "anonymous" && rule.effect === "allow");
+      const metadata = rules.map(({ role, effect, method: ruleMethod, path: rulePath }) => ({ role: roleName(role), effect, method: ruleMethod, path: rulePath }));
+      const anonymous = metadata.some((rule) => rule.role === "anonymous" && rule.effect === "allow");
       Object.assign(operation as Record<string, unknown>, { ...(anonymous ? {} : { security: [{ bearerAuth: [] }] }), "x-exensial-authorization": { required: !anonymous, anonymous, rules: metadata } });
     }
   }

@@ -59,7 +59,7 @@ export function documentationMiddleware(runtime: EntityRuntime, options: { exens
     const apiVersion = `v${Number(url.searchParams.get("version") ?? runtime.latestMajor())}`;
     const localizations = runtime.listRecords("localizations").map(({ locale, key, value }) => ({ locale, key, value })) as LocalizationEntry[];
     if (pathname === "/openapi.json") {
-      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(apiVersion), { ...options, language, localizations, permissions: options.security && runtime.has("permissions") ? runtime.listRecords("permissions") : [] }) };
+      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(apiVersion), { ...options, language, localizations, permissions: options.security && runtime.has("permissions") ? runtime.listRecords("permissions") : [], roles: options.security && runtime.has("roles") ? runtime.listRecords("roles") : [] }) };
       return;
     }
     if (pathname === "/docs") {

@@ -56,12 +56,14 @@ test("enforces endpoint permissions while leaving unconfigured endpoints anonymo
     const json = { "content-type": "application/json" };
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: json, body: JSON.stringify({ name: "books", namespace: "library", definition: "type Book = { title: string }" }) });
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: json, body: JSON.stringify({ name: "members", namespace: "library", definition: "type Member = { name: string }" }) });
-    await fetch(`${baseUrl}/v1/roles`, { method: "POST", headers: json, body: JSON.stringify({ name: "admin" }) });
+    const roles = await (await fetch(`${baseUrl}/v1/roles`, { method: "POST", headers: json, body: JSON.stringify([{ name: "anonymous" }, { name: "reader" }, { name: "admin" }]) })).json() as { items: Array<{ id: string; name: string }> };
+    const roleId = Object.fromEntries(roles.items.map((role) => [role.name, role.id]));
     await fetch(`${baseUrl}/v1/users`, { method: "POST", headers: json, body: JSON.stringify([{ username: "admin", passwordHash: hashPassword("secret"), roles: ["admin"], active: true }, { username: "reader", passwordHash: hashPassword("reader-secret"), roles: ["reader"], active: true }]) });
-    await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: "anonymous", method: "GET", path: "/v1/library/books*", effect: "allow" }, { role: "reader", method: "GET", path: "/v1/*", effect: "allow" }, { role: "admin", method: "POST", path: "/v1/library/books*", effect: "allow" }, { role: "admin", method: "GET", path: "/v1/users*", effect: "allow" }]) });
+    await fetch(`${baseUrl}/v1/permissions`, { method: "POST", headers: json, body: JSON.stringify([{ role: roleId.anonymous, method: "GET", path: "/v1/library/books*", effect: "allow" }, { role: roleId.reader, method: "GET", path: "/v1/*", effect: "allow" }, { role: roleId.admin, method: "POST", path: "/v1/library/books*", effect: "allow" }, { role: roleId.admin, method: "GET", path: "/v1/users*", effect: "allow" }]) });
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.paths["/v1/library/books"].post.security[0].bearerAuth.length, 0);
     assert.equal(openapi.paths["/v1/library/books"].post["x-exensial-authorization"].rules[0].role, "admin");
+    assert.equal(openapi.paths["/v1/library/books"].get["x-exensial-authorization"].anonymous, true);
     assert.equal((await fetch(`${baseUrl}/v1/library/books`)).status, 200);
     assert.equal((await fetch(`${baseUrl}/v1/library/members`)).status, 401);
     assert.equal((await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers: json, body: JSON.stringify({ title: "Blocked" }) })).status, 401);
