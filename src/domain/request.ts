@@ -7,6 +7,8 @@ export type PayloadPattern =
 /** A transport-neutral REST request after URL and body-pattern capture. */
 export interface DomainRequest {
   apiVersion: string;
+  /** Preferred response language captured by the transport adapter. */
+  language?: string;
   namespace?: string;
   entityName: string;
   action: CrudAction;

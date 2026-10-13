@@ -179,7 +179,7 @@ export function restPatternMiddleware(runtime: EntityRuntime): Middleware {
     if (!route) throw new EntityNotFoundError("Route not found");
     const action = actionFor(input.method, route.id);
     if (!action) throw new MethodNotAllowedError();
-    context.domainRequest = { ...route, action, ...(action === "list" ? { pagination: pagination(input.url) } : {}) };
+    context.domainRequest = { ...route, action, language: requestLanguage(context), ...(action === "list" ? { pagination: pagination(input.url) } : {}) };
     await next();
   };
 }
@@ -276,6 +276,12 @@ function pagination(url: string): { page: number; perPage: number } {
   const query = new URL(url, "http://localhost").searchParams;
   const number = (name: string, fallback: number) => { const value = Number(query.get(name) ?? fallback); if (!Number.isInteger(value) || value < 1 || value > 100) throw new ValidationError(`${name} must be an integer between 1 and 100`); return value; };
   return { page: number("page", 1), perPage: number("perPage", 25) };
+}
+
+function requestLanguage(context: RequestContext): string {
+  const urlLanguage = new URL(requireHttpInput(context).url, "http://localhost").searchParams.get("lang");
+  const header = context.request.headers["accept-language"];
+  return (urlLanguage ?? (Array.isArray(header) ? header[0] : header) ?? "en").split(",")[0].split("-")[0] || "en";
 }
 
 function paginationHeaders(context: RequestContext, runtime: EntityRuntime, request: DomainRequest): Record<string, string> {

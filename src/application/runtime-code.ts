@@ -30,7 +30,8 @@ export interface BusinessContext {
     update(id: string, changes: Record<string, unknown>): Promise<EntityRecord>;
     remove(id: string): Promise<void>;
   };
-  fail(message: string): never;
+  /** Fails with a localizable key and an English fallback; one argument remains supported. */
+  fail(key: string, fallback?: string): never;
 }
 
 const actions: CrudAction[] = ["create", "bulkCreate", "list", "get", "replace", "update", "delete"];
@@ -110,7 +111,7 @@ function businessContext(context: EntityOperationContext): BusinessContext {
       update: (id, changes) => records.update(entityName, id, changes, namespace),
       remove: (id) => records.remove(entityName, id, namespace)
     }),
-    fail(message) { throw new ValidationError(message); }
+    fail(key, fallback) { throw new ValidationError(context.runtime.localize(context.request.language, key, fallback ?? key)); }
   };
 }
 

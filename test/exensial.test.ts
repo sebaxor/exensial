@@ -358,6 +358,35 @@ test("installs a TypeScript domain module received through the entity endpoint",
   });
 });
 
+test("uses localized runtime failures and can assign a server-side timestamp", async () => {
+  await withApi(async (baseUrl) => {
+    const post = (path: string, body: unknown, language = "en") => fetch(`${baseUrl}${path}`, {
+      method: "POST", headers: { "content-type": "application/json", "accept-language": language }, body: JSON.stringify(body)
+    });
+    await post("/v1/localizations", [{
+      locale: "es", key: "library.loans.error.activeCannotDelete", value: "Los préstamos activos no se pueden eliminar."
+    }]);
+    const definition = await post("/v1/entities", {
+      name: "loans", namespace: "localized-library",
+      definition: "type Loan = { borrowedAt?: string; status?: string }",
+      code: `export default {
+        create: async (context, next) => { context.input.borrowedAt ??= new Date().toISOString(); context.input.status = "active"; await next(); },
+        delete: async (context) => { if (context.current.status === "active") context.fail("library.loans.error.activeCannotDelete", "Active loans cannot be deleted"); }
+      }`
+    });
+    assert.equal(definition.status, 201);
+    const loanResponse = await post("/v1/localized-library/loans", {});
+    const loan = await loanResponse.json();
+    assert.equal(loanResponse.status, 201);
+    assert.ok(Number.isFinite(Date.parse(loan.borrowedAt)));
+    const deletion = await fetch(`${baseUrl}/v1/localized-library/loans/${loan.id}?lang=es`, {
+      method: "DELETE", headers: { "accept-language": "es" }
+    });
+    assert.equal(deletion.status, 400);
+    assert.equal((await deletion.json()).error, "Los préstamos activos no se pueden eliminar.");
+  });
+});
+
 test("allows equal entity names in separate namespaces", async () => {
   await withApi(async (baseUrl) => {
     for (const namespace of ["acme.sales", "acme.support"]) {

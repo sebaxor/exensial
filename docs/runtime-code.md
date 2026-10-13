@@ -40,13 +40,29 @@ type BusinessContext = {
     update(id: string, changes: Record<string, unknown>): Promise<Record<string, unknown>>;
     remove(id: string): Promise<void>;
   };
-  fail(message: string): never;
+  /** One argument is a literal fallback; two arguments resolve a localization key first. */
+  fail(key: string, fallback?: string): never;
 };
 ```
 
 `input` is mutable before `next()`, allowing normalization and derived fields. `current` is the persisted record for item operations. `collection("books", "library")` is the readable shorthand for working with one related collection; `records` is the equivalent lower-level form. Neither reveals persistence implementation. This is the seam that will later map to a table repository, a transaction, an event stream, or another persistence mechanism.
 
 Because `input` is mutable, a domain module may also enforce ownership of workflow fields. For example, a loan's `create` operation can use `delete loan.returnedAt` and set `loan.status = "active"`; only its return transition may later set `returnedAt` during `update`.
+
+## Localized domain failures
+
+Use a stable key plus an English fallback for any domain message that should be shown to people. Exensial resolves the key against the runtime `localizations` entity using `?lang=<locale>` or the request's `Accept-Language` header, then falls back to English. This keeps text out of infrastructure while allowing a lab or installed domain to publish its own translations through REST.
+
+```ts
+if (context.current?.status === "active") {
+  context.fail(
+    "library.loans.error.activeCannotDelete",
+    "Active loans cannot be deleted"
+  );
+}
+```
+
+The corresponding domain installation creates ordinary localization records such as `{ locale: "es", key: "library.loans.error.activeCannotDelete", value: "Los préstamos activos no se pueden eliminar." }`. The single-argument form, `context.fail("Message")`, remains compatible but cannot be translated by key.
 
 ## Example: copy-aware loans
 

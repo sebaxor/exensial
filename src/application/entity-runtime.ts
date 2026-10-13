@@ -106,6 +106,16 @@ export class EntityRuntime {
     return entity.repository.query({ take: 100_000 }).items;
   }
 
+  /** Resolves a runtime string from the ordinary `localizations` entity. */
+  localize(language: string | undefined, key: string, fallback: string): string {
+    if (!this.has("localizations")) return fallback;
+    const locale = language ?? "en";
+    const entries = this.listRecords("localizations");
+    const entry = entries.find((item) => item.locale === locale && item.key === key)
+      ?? entries.find((item) => item.locale === "en" && item.key === key);
+    return typeof entry?.value === "string" ? entry.value : fallback;
+  }
+
   query(entityName: string, predicate: (record: EntityRecord) => boolean, options: { skip: number; take: number }, namespace?: string, apiVersion?: string): { items: EntityRecord[]; total: number } {
     const entity = this.resolve(entityName, namespace, apiVersion);
     if (!entity) throw new EntityNotFoundError("Entity not found");

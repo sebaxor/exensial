@@ -4,7 +4,7 @@ const withPermissions = process.argv.includes("--permissions");
 const baseUrl = process.argv.find((argument) => argument.startsWith("http")) ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
 let accessToken: string | undefined;
 const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "group.Library", "group.System"].map((key) => `ui.${key}`));
-const labEntityLocalizationPrefixes = ["entity.library.", "entity.roles.", "entity.users.", "entity.userRoles.", "entity.permissions.", "entity.entities.", "entity.localizations.", "entity.requests.", "entity.responses."];
+const labEntityLocalizationPrefixes = ["library.", "entity.library.", "entity.roles.", "entity.users.", "entity.userRoles.", "entity.permissions.", "entity.entities.", "entity.localizations.", "entity.requests.", "entity.responses."];
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -138,8 +138,10 @@ type Loan = {
   member: Member;
   /** @exensial.title en Borrowed at
    * @exensial.title es Fecha de préstamo
+   * @exensial.description en Defaults to the current server time when omitted.
+   * @exensial.description es Usa la hora actual del servidor cuando se omite.
    * @exensial.ui.control datetime */
-  borrowedAt: string;
+  borrowedAt?: string;
   /** @exensial.title en Due at
    * @exensial.title es Fecha límite
    * @exensial.ui.control datetime */
@@ -156,8 +158,8 @@ const booksCode = String.raw`
 function prepare(book, fail) {
   for (const field of ["title", "author", "isbn"]) book[field] = String(book[field] ?? "").trim();
   book.isbn = book.isbn.toUpperCase();
-  if (!book.title || !book.author || !book.isbn) fail("Book title, author, and isbn are required");
-  if (!Number.isInteger(book.copiesTotal) || book.copiesTotal < 1) fail("copiesTotal must be a positive integer");
+  if (!book.title || !book.author || !book.isbn) fail("library.books.error.requiredFields", "Book title, author, and ISBN are required");
+  if (!Number.isInteger(book.copiesTotal) || book.copiesTotal < 1) fail("library.books.error.copiesTotalPositive", "Total copies must be a positive integer");
   book.copiesAvailable = book.copiesTotal;
 }
 export default {
@@ -168,9 +170,9 @@ export default {
     for (const field of ["title", "author"]) if (field in change) change[field] = String(change[field]).trim();
     if ("isbn" in change) change.isbn = String(change.isbn).trim().toUpperCase();
     if ("copiesTotal" in change) {
-      if (!Number.isInteger(change.copiesTotal) || change.copiesTotal < 1) context.fail("copiesTotal must be a positive integer");
+      if (!Number.isInteger(change.copiesTotal) || change.copiesTotal < 1) context.fail("library.books.error.copiesTotalPositive", "Total copies must be a positive integer");
       const borrowed = Number(current.copiesTotal) - Number(current.copiesAvailable);
-      if (Number(change.copiesTotal) < borrowed) context.fail("copiesTotal cannot be lower than borrowed copies");
+      if (Number(change.copiesTotal) < borrowed) context.fail("library.books.error.copiesBelowBorrowed", "Total copies cannot be lower than borrowed copies");
       change.copiesAvailable = Number(change.copiesTotal) - borrowed;
     }
     await next();
@@ -181,7 +183,7 @@ const membersCode = String.raw`
 function prepare(member, fail) {
   member.name = String(member.name ?? "").trim();
   member.email = String(member.email ?? "").trim().toLowerCase();
-  if (!member.name || !member.email.includes("@")) fail("A name and valid email are required");
+  if (!member.name || !member.email.includes("@")) fail("library.members.error.requiredFields", "A name and valid email are required");
   member.active = true;
 }
 export default {
@@ -190,7 +192,7 @@ export default {
   update: async (context, next) => {
     const member = context.input;
     if ("name" in member) member.name = String(member.name).trim();
-    if ("email" in member) { member.email = String(member.email).trim().toLowerCase(); if (!member.email.includes("@")) context.fail("A valid email is required"); }
+    if ("email" in member) { member.email = String(member.email).trim().toLowerCase(); if (!member.email.includes("@")) context.fail("library.members.error.validEmail", "A valid email is required"); }
     await next();
   }
 };`;
@@ -200,28 +202,45 @@ const isDate = (value) => typeof value === "string" && Number.isFinite(Date.pars
 export default {
   create: async (context, next) => {
     const loan = context.input;
-    for (const field of ["book", "member", "borrowedAt", "dueAt"]) if (!String(loan[field] ?? "").trim()) context.fail(field + " is required");
+    if (!String(loan.borrowedAt ?? "").trim()) loan.borrowedAt = new Date().toISOString();
+    for (const field of ["book", "member", "dueAt"]) if (!String(loan[field] ?? "").trim()) context.fail("library.loans.error.requiredFields", "Book, member, and due date are required");
     const books = context.collection("books", "library"), members = context.collection("members", "library");
     const book = books.get(String(loan.book)), member = members.get(String(loan.member));
-    if (!member?.active) context.fail("Member is not active");
-    if (!book || Number(book.copiesAvailable) < 1) context.fail("Book is not available");
-    if (!isDate(loan.borrowedAt) || !isDate(loan.dueAt) || Date.parse(loan.dueAt) <= Date.parse(loan.borrowedAt)) context.fail("A later valid dueAt is required");
+    if (!member?.active) context.fail("library.loans.error.memberInactive", "Member is not active");
+    if (!book || Number(book.copiesAvailable) < 1) context.fail("library.loans.error.bookUnavailable", "Book is not available");
+    if (!isDate(loan.borrowedAt) || !isDate(loan.dueAt) || Date.parse(loan.dueAt) <= Date.parse(loan.borrowedAt)) context.fail("library.loans.error.dueDate", "Due date must be later than the borrowed date");
     await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) - 1 });
     try { delete loan.returnedAt; loan.status = "active"; await next(); }
     catch (error) { await books.update(book.id, { copiesAvailable: Number(book.copiesAvailable) }); throw error; }
   },
   update: async (context, next) => {
     const loan = context.current, change = context.input;
-    if (loan.status !== "active" || change.status !== "returned" || !isDate(change.returnedAt)) context.fail("Only an active loan with returnedAt may be returned");
+    if (loan.status !== "active" || change.status !== "returned" || !isDate(change.returnedAt)) context.fail("library.loans.error.returnActiveLoan", "Only an active loan with a returned date may be returned");
     await next();
     const books = context.collection("books", "library"), book = books.get(String(loan.book));
     const available = Number(book.copiesAvailable) + 1;
-    if (available > Number(book.copiesTotal)) context.fail("copiesAvailable cannot exceed copiesTotal");
+    if (available > Number(book.copiesTotal)) context.fail("library.loans.error.availableAboveTotal", "Available copies cannot exceed total copies");
     await books.update(book.id, { copiesAvailable: available });
   },
-  delete: async (context, next) => { if (context.current.status === "active") context.fail("Active loans cannot be deleted"); await next(); },
-  bulkCreate: async (context) => context.fail("Bulk loans are not allowed")
+  delete: async (context, next) => { if (context.current.status === "active") context.fail("library.loans.error.activeCannotDelete", "Active loans cannot be deleted"); await next(); },
+  bulkCreate: async (context) => context.fail("library.loans.error.bulkCreate", "Bulk loan creation is not allowed")
 };`;
+
+const domainErrorLocalizations = [
+  ["library.books.error.requiredFields", "Book title, author, and ISBN are required", "El título, el autor y el ISBN son obligatorios."],
+  ["library.books.error.copiesTotalPositive", "Total copies must be a positive integer", "El total de copias debe ser un entero positivo."],
+  ["library.books.error.copiesBelowBorrowed", "Total copies cannot be lower than borrowed copies", "El total de copias no puede ser menor que las copias prestadas."],
+  ["library.members.error.requiredFields", "A name and valid email are required", "El nombre y un correo electrónico válido son obligatorios."],
+  ["library.members.error.validEmail", "A valid email is required", "Se requiere un correo electrónico válido."],
+  ["library.loans.error.requiredFields", "Book, member, and due date are required", "El libro, el miembro y la fecha límite son obligatorios."],
+  ["library.loans.error.memberInactive", "Member is not active", "El miembro no está activo."],
+  ["library.loans.error.bookUnavailable", "Book is not available", "El libro no está disponible."],
+  ["library.loans.error.dueDate", "Due date must be later than the borrowed date", "La fecha límite debe ser posterior a la fecha de préstamo."],
+  ["library.loans.error.returnActiveLoan", "Only an active loan with a returned date may be returned", "Solo se puede devolver un préstamo activo con fecha de devolución."],
+  ["library.loans.error.availableAboveTotal", "Available copies cannot exceed total copies", "Las copias disponibles no pueden superar el total de copias."],
+  ["library.loans.error.activeCannotDelete", "Active loans cannot be deleted", "Los préstamos activos no se pueden eliminar."],
+  ["library.loans.error.bulkCreate", "Bulk loan creation is not allowed", "No se permite la creación masiva de préstamos."]
+] as const;
 
 async function resetLibrary(): Promise<void> {
   await signInIfPresent();
@@ -283,6 +302,10 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "members", version: "1.0.0", namespace: "library", group: "Library", icon: "users,👥", definition: membersDefinition, code: membersCode });
   await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", icon: "calendar,📅", definition: loansDefinition, code: loansCode });
   await request("POST", "/v1/localizations", [
+    ...domainErrorLocalizations.flatMap(([key, english, spanish]) => [
+      { locale: "en", key, value: english },
+      { locale: "es", key, value: spanish }
+    ]),
     { locale: "es", key: "ui.consoleHint", value: "Consola de entidades en tiempo de ejecución" },
     { locale: "es", key: "ui.loading", value: "Cargando…" },
     { locale: "es", key: "ui.language", value: "Idioma" },
