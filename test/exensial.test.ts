@@ -132,6 +132,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /hashchange/);
     assert.match(consolePage, /lookup-dialog/);
     assert.match(consolePage, /Filter/);
+    assert.match(consolePage, /applyUiStrings/);
+    assert.match(consolePage, /x-exensial-ui-localization/);
   });
 });
 
@@ -158,12 +160,13 @@ test("advertises and executes the optional ExensialQuery capability", async () =
 test("applies runtime localizations to generated OpenAPI", async () => {
   await withApi(async (baseUrl) => {
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "tasks", definition: "/** @exensial.title en Tasks */\ntype Task = { title: string }" }) });
-    const localization = await fetch(`${baseUrl}/v1/localizations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ locale: "es", key: "entity.tasks.title", value: "Tareas" }) });
+    const localization = await fetch(`${baseUrl}/v1/localizations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify([{ locale: "es", key: "entity.tasks.title", value: "Tareas" }, { locale: "es", key: "ui.save", value: "Guardar" }]) });
     assert.equal(localization.status, 201);
     const openapi = await (await fetch(`${baseUrl}/openapi.json?lang=es`)).json();
     assert.equal(openapi["x-exensial-language"], "es");
     assert.equal(openapi.components.schemas.tasks.title, "Tareas");
     assert.ok(openapi["x-exensial-locales"].includes("es"));
+    assert.equal(openapi["x-exensial-ui-localization"]["ui.save"], "Guardar");
   });
 });
 

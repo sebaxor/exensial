@@ -1,4 +1,5 @@
 const baseUrl = process.argv[2] ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
+const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches"].map((key) => `ui.${key}`));
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -141,8 +142,8 @@ async function resetLibrary(): Promise<void> {
   for (const entity of entities.filter((item) => item.namespace === "library" && ["loans", "members", "books"].includes(item.name))) {
     await request("DELETE", `/v1/entities/${entity.id}`);
   }
-  const localizations = await request("GET", "/v1/localizations") as Array<{ id: string; key: string }>;
-  for (const entry of localizations.filter((item) => item.key.startsWith("entity.library."))) await request("DELETE", `/v1/localizations/${entry.id}`);
+  const localizations = await request("GET", "/v1/localizations") as Array<{ id: string; key: string; locale: string }>;
+  for (const entry of localizations.filter((item) => item.key.startsWith("entity.library.") || (item.locale === "es" && labUiKeys.has(item.key)))) await request("DELETE", `/v1/localizations/${entry.id}`);
 }
 
 async function install(): Promise<void> {
@@ -151,6 +152,26 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "members", namespace: "library", group: "Library", definition: membersDefinition, code: membersCode });
   await request("POST", "/v1/entities", { name: "loans", namespace: "library", group: "Library", definition: loansDefinition, code: loansCode });
   await request("POST", "/v1/localizations", [
+    { locale: "es", key: "ui.consoleHint", value: "Consola de entidades en tiempo de ejecución" },
+    { locale: "es", key: "ui.language", value: "Idioma" },
+    { locale: "es", key: "ui.rows", value: "Filas" },
+    { locale: "es", key: "ui.newRecord", value: "Nuevo registro" },
+    { locale: "es", key: "ui.save", value: "Guardar" },
+    { locale: "es", key: "ui.cancel", value: "Cancelar" },
+    { locale: "es", key: "ui.close", value: "Cerrar" },
+    { locale: "es", key: "ui.actions", value: "Acciones" },
+    { locale: "es", key: "ui.edit", value: "Editar" },
+    { locale: "es", key: "ui.delete", value: "Eliminar" },
+    { locale: "es", key: "ui.previous", value: "Anterior" },
+    { locale: "es", key: "ui.next", value: "Siguiente" },
+    { locale: "es", key: "ui.page", value: "Página" },
+    { locale: "es", key: "ui.of", value: "de" },
+    { locale: "es", key: "ui.records", value: "registros" },
+    { locale: "es", key: "ui.select", value: "Seleccionar" },
+    { locale: "es", key: "ui.filter", value: "Filtrar" },
+    { locale: "es", key: "ui.matchingRecords", value: "registros coincidentes" },
+    { locale: "es", key: "ui.noRecords", value: "Aún no hay registros." },
+    { locale: "es", key: "ui.noMatches", value: "No hay registros coincidentes." },
     { locale: "es", key: "entity.library.books.title", value: "Libros" },
     { locale: "es", key: "entity.library.members.title", value: "Miembros" },
     { locale: "es", key: "entity.library.loans.title", value: "Préstamos" },
