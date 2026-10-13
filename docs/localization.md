@@ -16,6 +16,7 @@ The stable metadata keys currently supported by generated OpenAPI and the Consol
 
 - `openapi.info.title` and `openapi.info.description`
 - `openapi.authentication.tag`, `openapi.authentication.login.summary`, `openapi.authentication.login.description`, `openapi.authentication.login.authenticated`, and `openapi.authentication.login.invalidCredentials` for generated local-authentication documentation
+- `openapi.exensialQuery.capability.description`, `openapi.exensialQuery.description`, `openapi.exensialQuery.filter.description`, `openapi.exensialQuery.skip.description`, `openapi.exensialQuery.top.description`, and `openapi.exensialQuery.response.matched` for generated ExensialQuery documentation
 - `entity.<namespace.name-or-name>.title`
 - `entity.<namespace.name-or-name>.description`
 - `entity.<namespace.name-or-name>.field.<field>.title`

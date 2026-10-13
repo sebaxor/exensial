@@ -4,7 +4,7 @@ const withPermissions = process.argv.includes("--permissions");
 const baseUrl = process.argv.find((argument) => argument.startsWith("http")) ?? process.env.EXENSIAL_URL ?? "http://localhost:3000";
 let accessToken: string | undefined;
 const labUiKeys = new Set(["consoleHint", "language", "rows", "newRecord", "new", "save", "cancel", "close", "actions", "edit", "delete", "previous", "next", "page", "of", "records", "select", "filter", "matchingRecords", "noRecords", "noMatches", "find", "noRecordSelected", "saved", "deleted", "signIn", "signOut", "guest", "anonymous", "authenticated", "group.Library", "group.System"].map((key) => `ui.${key}`));
-const labEntityLocalizationPrefixes = ["library.", "entity.library.", "entity.roles.", "entity.users.", "entity.userRoles.", "entity.permissions.", "entity.entities.", "entity.localizations.", "entity.requests.", "entity.responses."];
+const labEntityLocalizationPrefixes = ["library.", "openapi.exensialQuery.", "entity.library.", "entity.roles.", "entity.users.", "entity.userRoles.", "entity.permissions.", "entity.entities.", "entity.localizations.", "entity.requests.", "entity.responses."];
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -322,6 +322,12 @@ async function install(): Promise<void> {
       { locale: "en", key, value: english },
       { locale: "es", key, value: spanish }
     ]),
+    { locale: "es", key: "openapi.exensialQuery.capability.description", value: "Capacidad opcional de lectura similar a OData. Admite $filter (contains, startswith, endswith, eq, ne, gt, ge, lt y le unidos con and), $skip y $top. Solo se pueden consultar campos anotados como buscables o filtrables." },
+    { locale: "es", key: "openapi.exensialQuery.description", value: "Usa la capacidad opcional ExensialQuery. Es un subconjunto seguro y de solo lectura similar a OData; en $filter solo se pueden usar campos anotados con @exensial.ui.searchable o @exensial.ui.filterable." },
+    { locale: "es", key: "openapi.exensialQuery.filter.description", value: "Ejemplos: contains(title, 'Dune') o copiesAvailable gt 0. Las cláusulas se pueden unir con and." },
+    { locale: "es", key: "openapi.exensialQuery.skip.description", value: "Cantidad de registros coincidentes que se omiten. El valor predeterminado es 0." },
+    { locale: "es", key: "openapi.exensialQuery.top.description", value: "Máximo de registros coincidentes que se devuelven. El valor predeterminado es 25 y el máximo es 100." },
+    { locale: "es", key: "openapi.exensialQuery.response.matched", value: "Se devolvieron los registros coincidentes. X-Total-Count indica el total antes de paginar." },
     { locale: "es", key: "ui.consoleHint", value: "Consola de entidades en tiempo de ejecución" },
     { locale: "es", key: "ui.loading", value: "Cargando…" },
     { locale: "es", key: "ui.language", value: "Idioma" },

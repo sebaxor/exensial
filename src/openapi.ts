@@ -28,7 +28,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
       query: {
         exensialQuery: {
           root: "/v1/query/exensial",
-          description: "Optional OData-like read capability. Supports $filter (contains, startswith, endswith, eq, ne, gt, ge, lt, le joined with and), $skip, and $top. Only fields annotated as searchable or filterable can be queried."
+          description: exensialQueryText(language, localizations, "capability.description", { en: "Optional OData-like read capability. Supports $filter (contains, startswith, endswith, eq, ne, gt, ge, lt, le joined with and), $skip, and $top. Only fields annotated as searchable or filterable can be queried.", es: "Capacidad opcional de lectura similar a OData. Admite $filter (contains, startswith, endswith, eq, ne, gt, ge, lt y le unidos con and), $skip y $top. Solo se pueden consultar campos anotados como buscables o filtrables." })
         }
       }
     } : {}) },
@@ -76,20 +76,24 @@ function exensialQueryPaths(definition: EntityDefinition, language: string, loca
         tags: [schemaKey(definition), "ExensialQuery"],
         operationId: `query${identifier(schemaKey(definition))}`,
         summary: operationSummary(definition, "query", language, localizations),
-        description: "Uses the optional ExensialQuery capability. It is an OData-like, safe read-only subset; only fields annotated with @exensial.ui.searchable or @exensial.ui.filterable may be used in $filter.",
+        description: exensialQueryText(language, localizations, "description", { en: "Uses the optional ExensialQuery capability. It is an OData-like, safe read-only subset; only fields annotated with @exensial.ui.searchable or @exensial.ui.filterable may be used in $filter.", es: "Usa la capacidad opcional ExensialQuery. Es un subconjunto seguro y de solo lectura similar a OData; en $filter solo se pueden usar campos anotados con @exensial.ui.searchable o @exensial.ui.filterable." }),
         parameters: [
-          { name: "$filter", in: "query", description: "Examples: contains(title, 'Dune') or copiesAvailable gt 0. Clauses can be joined with and.", schema: { type: "string" } },
-          { name: "$skip", in: "query", description: "Number of matching records to omit. Defaults to 0.", schema: { type: "integer", minimum: 0, default: 0 } },
-          { name: "$top", in: "query", description: "Maximum matching records to return. Defaults to 25; maximum 100.", schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }
+          { name: "$filter", in: "query", description: exensialQueryText(language, localizations, "filter.description", { en: "Examples: contains(title, 'Dune') or copiesAvailable gt 0. Clauses can be joined with and.", es: "Ejemplos: contains(title, 'Dune') o copiesAvailable gt 0. Las cláusulas se pueden unir con and." }), schema: { type: "string" } },
+          { name: "$skip", in: "query", description: exensialQueryText(language, localizations, "skip.description", { en: "Number of matching records to omit. Defaults to 0.", es: "Cantidad de registros coincidentes que se omiten. El valor predeterminado es 0." }), schema: { type: "integer", minimum: 0, default: 0 } },
+          { name: "$top", in: "query", description: exensialQueryText(language, localizations, "top.description", { en: "Maximum matching records to return. Defaults to 25; maximum 100.", es: "Máximo de registros coincidentes que se devuelven. El valor predeterminado es 25 y el máximo es 100." }), schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }
         ],
         responses: {
-          200: { description: "Matching records returned. X-Total-Count is the total before paging.", headers: { "X-Total-Count": { schema: { type: "integer" } }, "X-Query-Skip": { schema: { type: "integer" } }, "X-Query-Top": { schema: { type: "integer" } } }, content: jsonContent({ type: "array", items: reference }) },
+          200: { description: exensialQueryText(language, localizations, "response.matched", { en: "Matching records returned. X-Total-Count is the total before paging.", es: "Se devolvieron los registros coincidentes. X-Total-Count indica el total antes de paginar." }), headers: { "X-Total-Count": { schema: { type: "integer" } }, "X-Query-Skip": { schema: { type: "integer" } }, "X-Query-Top": { schema: { type: "integer" } } }, content: jsonContent({ type: "array", items: reference }) },
           400: validationErrorResponse(),
           404: errorResponse()
         }
       }
     }
   };
+}
+
+function exensialQueryText(language: string, localizations: LocalizationEntry[], key: string, fallback: LocalizedText): string {
+  return localizedValue(localizations, language, `openapi.exensialQuery.${key}`, fallback) ?? fallback.en;
 }
 
 function entitySchema(definition: EntityDefinition, language: string, localizations: LocalizationEntry[]): Schema {
