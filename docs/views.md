@@ -78,4 +78,6 @@ OpenAPI advertises the capability without violating the OpenAPI standard:
 
 Clients fetch `GET /v1/views/manifest` once after capability discovery. The response combines explicit views/menus with default CRUD views synthesized from every active entity. An explicit view with a matching `target` replaces the corresponding default query or detail view.
 
+The vanilla Exensial Console discovers this manifest automatically. Visible menu entries targeting a QueryView are added to its navigation and their central data endpoint is rendered with the same base grid markup used by the console. This initial grid integration intentionally displays the persisted projection; configurable sort/filter/group controls are the next grid increment.
+
 The complete intended design and delivery sequence are documented in [the layered architecture plan](views-and-layered-architecture-plan.md).
