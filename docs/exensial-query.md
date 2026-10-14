@@ -1,4 +1,6 @@
-# ExensialQuery capability
+# ExensialQuery HTTP capability
+
+> This document describes the existing OData-like HTTP lookup capability. The separate reusable SQL-subset package lives in [`packages/exensialquery`](../packages/exensialquery/README.md). Both are intentionally read-only, but they are different transports/dialects today.
 
 `ExensialQuery` is an optional, read-only HTTP capability for metadata-driven consumers such as the Exensial Console. It is not part of the base CRUD contract and it is not a replacement for an eventual OData or GraphQL implementation.
 

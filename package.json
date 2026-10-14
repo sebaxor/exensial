@@ -8,8 +8,9 @@
     "start": "tsx src/server.ts",
     "lab:library": "tsx scripts/install-library-lab.ts",
     "lab:library:permissions": "tsx scripts/install-library-lab.ts --permissions",
-    "test": "tsx --test test/*.test.ts",
-    "check": "tsc --noEmit"
+    "build:exensialquery": "npm --prefix packages/exensialquery run build",
+    "test": "tsx --test test/*.test.ts packages/exensialquery/test/*.test.ts",
+    "check": "tsc --noEmit && tsc --project packages/exensialquery/tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

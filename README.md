@@ -64,6 +64,8 @@ Install the runnable [library circulation lab](docs/labs/library.md) with `npm r
 
 Optional technical capabilities are announced dynamically in OpenAPI. The current [ExensialQuery capability](docs/exensial-query.md) provides a safe, OData-like filtered read endpoint for metadata-driven clients.
 
+The reusable [ExensialQuery package](packages/exensialquery/README.md) is a separate, dependency-free SQL-subset language: SQL ↔ portable AST ↔ an array executor. It is designed to be shared by browser and server adapters; it is not yet a replacement for the existing HTTP lookup capability.
+
 [Runtime localization](docs/localization.md) is a system entity that can override generated OpenAPI and Console labels per language without redeploying entity code.
 
 [Entity versioning](docs/versioning.md) maps semantic entity versions to `/vN` routes and generates OpenAPI per major version.
