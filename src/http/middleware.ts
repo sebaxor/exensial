@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
 import { compileExensialFilter } from "../application/exensial-query";
-import { viewManifest } from "../application/views";
+import { executeQueryView, queryViewSourcePaths, viewManifest } from "../application/views";
 import type { LocalizationEntry } from "../application/localization";
 import type { EntityRecord } from "../domain/entity";
 import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
@@ -178,9 +178,23 @@ export function viewsMiddleware(runtime: EntityRuntime, enabled = true): Middlew
     if (!enabled) return next();
     const input = requireHttpInput(context);
     const url = new URL(input.url, "http://localhost");
-    if (url.pathname !== "/v1/views/manifest") return next();
-    if (input.method !== "GET") throw new MethodNotAllowedError();
-    context.domainResponse = { status: 200, body: viewManifest(runtime, `v${Number(url.searchParams.get("version") ?? runtime.latestMajor())}`) };
+    const apiVersion = `v${Number(url.searchParams.get("version") ?? runtime.latestMajor())}`;
+    if (url.pathname === "/v1/views/manifest") {
+      if (input.method !== "GET") throw new MethodNotAllowedError();
+      context.domainResponse = { status: 200, body: viewManifest(runtime, apiVersion) };
+      return;
+    }
+    const match = url.pathname.match(/^\/v\d+\/views\/([^/]+)\/data$/);
+    if (!match) return next();
+    if (input.method !== "POST") throw new MethodNotAllowedError();
+    const viewId = decodeURIComponent(match[1]);
+    if (runtime.has("permissions")) for (const path of queryViewSourcePaths(runtime, viewId, apiVersion)) authorize(runtime, context.principal, "GET", path);
+    const payload = input.body?.trim() ? parseJson(input.body) : {};
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new ValidationError("QueryView parameters must be a JSON object");
+    const parameters = (payload as { parameters?: unknown }).parameters ?? {};
+    if (!parameters || typeof parameters !== "object" || Array.isArray(parameters) || Object.values(parameters).some((value) => !["string", "number", "boolean"].includes(typeof value) && value !== null)) throw new ValidationError("QueryView parameters must be scalar values");
+    const result = executeQueryView(runtime, viewId, parameters as Record<string, string | number | boolean | null>, apiVersion);
+    context.domainResponse = { status: 200, body: { viewId: result.view.viewId, items: result.items } };
   };
 }
 
@@ -352,7 +366,7 @@ function matchRoute(url: string, runtime: EntityRuntime): Pick<DomainRequest, "a
 function matchExensialQueryRoute(url: string, runtime: EntityRuntime): Pick<DomainRequest, "apiVersion" | "namespace" | "entityName"> | undefined {
   const segments = new URL(url, "http://localhost").pathname.split("/").filter(Boolean).map(decodeURIComponent);
   const [apiVersion, engine, capability, nameOrNamespace, maybeName, extra] = segments;
-  if (!apiVersion || !/^v\d+$/.test(apiVersion) || engine !== "query" || capability !== "exensial" || extra) return undefined;
+  if (!apiVersion || !/^v\d+$/.test(apiVersion) || engine !== "query" || !["exensial", "odata"].includes(capability) || extra) return undefined;
   if (maybeName && runtime.has(maybeName, nameOrNamespace, apiVersion)) return { apiVersion, namespace: nameOrNamespace, entityName: maybeName };
   if (!maybeName && runtime.has(nameOrNamespace, undefined, apiVersion)) return { apiVersion, entityName: nameOrNamespace };
   return undefined;

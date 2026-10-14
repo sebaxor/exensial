@@ -10,7 +10,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
-  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...definitions.map((definition) => ({ ...entityPaths(definition, language, localizations), ...(capabilities.exensialQuery ? exensialQueryPaths(definition, language, localizations) : {}) })));
+  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...(capabilities.views ? [viewPaths(language)] : []), ...definitions.map((definition) => ({ ...entityPaths(definition, language, localizations), ...(capabilities.exensialQuery ? exensialQueryPaths(definition, language, localizations) : {}) })));
   if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? [], capabilities.roles ?? []);
   return {
     openapi: "3.0.4",
@@ -25,16 +25,23 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
     "x-exensial-capabilities": {
       ...(capabilities.security ? { security: { loginPath: "/v1/auth/login", scheme: "bearerAuth", description: "Operations with x-exensial-authorization require a matching JWT role." } } : {}),
       ...(capabilities.views ? { views: { catalogPath: "/v1/views", menuCatalogPath: "/v1/menus", manifestPath: "/v1/views/manifest", dataPathTemplate: "/v1/views/{viewId}/data" } } : {}),
-      ...(capabilities.exensialQuery ? {
-      query: {
-        exensialQuery: {
-          root: "/v1/query/exensial",
-          description: exensialQueryText(language, localizations, "capability.description", { en: "Optional OData-like read capability. Supports $filter (contains, startswith, endswith, eq, ne, gt, ge, lt, le joined with and), $skip, and $top. Only fields annotated as searchable or filterable can be queried.", es: "Capacidad opcional de lectura similar a OData. Admite $filter (contains, startswith, endswith, eq, ne, gt, ge, lt y le unidos con and), $skip y $top. Solo se pueden consultar campos anotados como buscables o filtrables." })
-        }
-      }
-    } : {}) },
+      ...(capabilities.exensialQuery ? { query: { languages: { odata: { root: "/v1/query/odata", legacyRoots: ["/v1/query/exensial"], transport: "GET", description: exensialQueryText(language, localizations, "capability.description", { en: "Optional OData-like read capability. Supports $filter (contains, startswith, endswith, eq, ne, gt, ge, lt, le joined with and), $skip, and $top. Only fields annotated as searchable or filterable can be queried.", es: "Capacidad opcional de lectura similar a OData. Admite $filter (contains, startswith, endswith, eq, ne, gt, ge, lt y le unidos con and), $skip y $top. Solo se pueden consultar campos anotados como buscables o filtrables." }) }, exensialquery: { representation: "exensialquery-ast", transport: "POST", availability: "named-views" } }, exensialQuery: { root: "/v1/query/exensial", deprecated: true } } } : {}) },
     paths,
     components: { schemas, ...(capabilities.security ? { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT", description: "Obtain a token from POST /v1/auth/login and send it as Authorization: Bearer <token>. Endpoint permissions decide whether authentication is required." } } } : {}) }
+  };
+}
+
+function viewPaths(language: string): Record<string, unknown> {
+  const text = language === "es" ? { tag: "Vistas", summary: "Ejecutar una vista de consulta", description: "Ejecuta el AST ExensialQuery persistido de una QueryView con parámetros escalares." } : { tag: "Views", summary: "Execute a QueryView", description: "Executes a QueryView's persisted ExensialQuery AST with scalar parameters." };
+  return {
+    "/v1/views/{viewId}/data": {
+      post: {
+        tags: [text.tag], operationId: "executeQueryView", summary: text.summary, description: text.description,
+        parameters: [{ name: "viewId", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { required: false, content: jsonContent({ type: "object", properties: { parameters: { type: "object", additionalProperties: { nullable: true } } } }, { parameters: {} }) },
+        responses: { 200: { description: language === "es" ? "Resultado de la vista" : "View result", content: jsonContent({ type: "object", properties: { viewId: { type: "string" }, items: { type: "array", items: { type: "object" } } } }) }, 400: validationErrorResponse(), 404: errorResponse() }
+      }
+    }
   };
 }
 

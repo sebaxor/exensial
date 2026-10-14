@@ -2,17 +2,17 @@
 
 > This document describes the existing OData-like HTTP lookup capability. The separate reusable SQL-subset package lives in [`packages/exensialquery`](../packages/exensialquery/README.md). Both are intentionally read-only, but they are different transports/dialects today.
 
-`ExensialQuery` is an optional, read-only HTTP capability for metadata-driven consumers such as the Exensial Console. It is not part of the base CRUD contract and it is not a replacement for an eventual OData or GraphQL implementation.
+This legacy HTTP capability is now advertised as `odata`: it is an optional, read-only URL-oriented filter capability for metadata-driven consumers such as the Exensial Console. It is not part of the base CRUD contract and it is not a replacement for the SQL-subset `exensialquery` package or an eventual GraphQL implementation.
 
-When enabled (the default), `/openapi.json` exposes the root in `x-exensial-capabilities.query.exensialQuery` and adds one documented query operation per active entity. Disable it with `EXENSIAL_ENABLE_EXENSIAL_QUERY=false` or `createApp({ enableExensialQuery: false })`. A consumer must discover the capability from OpenAPI before using it.
+When enabled (the default), `/openapi.json` exposes it in `x-exensial-capabilities.query.languages.odata` and adds one documented query operation per active entity. `x-exensial-capabilities.query.exensialQuery` remains as a deprecated compatibility descriptor. Disable it with `EXENSIAL_ENABLE_EXENSIAL_QUERY=false` or `createApp({ enableExensialQuery: false })`. A consumer must discover the capability from OpenAPI before using it.
 
 ## Endpoint
 
-The root is `/v1/query/exensial`:
+The preferred root is `/v1/query/odata`; `/v1/query/exensial` remains a compatibility alias:
 
 ```text
-GET /v1/query/exensial/{entity}
-GET /v1/query/exensial/{namespace}/{entity}
+GET /v1/query/odata/{entity}
+GET /v1/query/odata/{namespace}/{entity}
 ```
 
 It accepts an OData-like subset:

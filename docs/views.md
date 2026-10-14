@@ -30,7 +30,21 @@ Every record has Exensial's opaque infrastructure `id`. `viewId` and `menuId` ar
 }
 ```
 
-`target` makes an explicit view override the generated CRUD view for the same entity and slot. Query execution endpoints are introduced in the next Views increment; this first increment persists and publishes the definitions and their manifest.
+`target` makes an explicit view override the generated CRUD view for the same entity and slot.
+
+## Executing a QueryView
+
+The central endpoint executes the persisted AST. Callers supply only scalar parameters; they cannot replace the query definition:
+
+```bash
+curl -X POST http://localhost:3000/v1/views/Library_Book_QueryView/data \
+  -H 'content-type: application/json' \
+  -d '{"parameters":{"active":true}}'
+```
+
+The response is `{ "viewId": "...", "items": [...] }`. The initial `in-memory` query target reads the entities named by the AST and runs the portable `exensialquery` executor. It strips sensitive fields and, when endpoint permissions are installed, validates `GET` access for every source entity before it executes a view.
+
+The OpenAPI capability advertises `exensialquery` as `named-views`: it is available through persisted QueryViews, not yet as a general ad-hoc AST endpoint.
 
 ## Menu definition
 

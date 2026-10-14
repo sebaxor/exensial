@@ -1,5 +1,7 @@
 import type { EntityDefinition, EntityRecord } from "../domain/entity";
 import type { EntityRuntime } from "./entity-runtime";
+import { execute, type Parameters, type SelectQuery, type Tables } from "../../packages/exensialquery/src/index";
+import { ValidationError } from "./entity-runtime";
 
 export type ViewManifestEntry = {
   viewId: string;
@@ -38,6 +40,27 @@ export function viewManifest(runtime: EntityRuntime, apiVersion = `v${runtime.la
   return { views, menus };
 }
 
+/** Executes a persisted ExensialQuery QueryView through the active repository target. */
+export function executeQueryView(runtime: EntityRuntime, viewId: string, parameters: Parameters = {}, apiVersion = `v${runtime.latestMajor()}`): { view: ViewManifestEntry; items: Record<string, unknown>[]; sources: EntityDefinition[] } {
+  const view = viewManifest(runtime, apiVersion).views.find((item) => item.viewId === viewId);
+  if (!view) throw new ValidationError("View not found");
+  if (view.kind !== "query") throw new ValidationError("Only QueryViews can be executed");
+  if (!view.source || view.source.language !== "exensialquery") throw new ValidationError("QueryView does not use the installed ExensialQuery language");
+  const ast = view.source.ast;
+  if (!isSelectQuery(ast)) throw new ValidationError("QueryView source must contain an ExensialQuery SelectQuery AST");
+  const sources = querySources(ast).map((name) => resolveSource(runtime, name, apiVersion));
+  const tables: Tables = {};
+  for (const source of sources) tables[source.tableName] = publicRecords(runtime, source.definition);
+  return { view, items: execute(ast, tables, parameters), sources: sources.map((source) => source.definition) };
+}
+
+export function queryViewSourcePaths(runtime: EntityRuntime, viewId: string, apiVersion = `v${runtime.latestMajor()}`): string[] {
+  const view = viewManifest(runtime, apiVersion).views.find((item) => item.viewId === viewId);
+  const ast = view?.source?.ast;
+  if (!view || !ast || !isSelectQuery(ast)) return [];
+  return querySources(ast).map((name) => resolveSource(runtime, name, apiVersion)).map(({ definition }) => `/v1/${definition.context?.namespace ? `${definition.context.namespace}/` : ""}${definition.name}`);
+}
+
 function defaultViews(definition: EntityDefinition): ViewManifestEntry[] {
   const namespace = definition.context?.namespace;
   const base = `entity:${namespace ? `${namespace}.` : ""}${definition.name}`;
@@ -62,3 +85,19 @@ function menuRecord(record: EntityRecord): MenuManifestEntry {
 }
 function targetKey(target: NonNullable<ViewManifestEntry["target"]>): string { return `${target.namespace ?? ""}/${target.entity}/${target.slot}`; }
 function object(value: unknown): Record<string, unknown> | undefined { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined; }
+
+function isSelectQuery(value: unknown): value is SelectQuery { return Boolean(value && typeof value === "object" && (value as { type?: unknown }).type === "select" && Array.isArray((value as { select?: unknown }).select) && (value as { from?: { type?: unknown } }).from?.type === "table"); }
+function querySources(query: SelectQuery): string[] {
+  const direct = [query.from.name, ...(query.joins ?? []).map((join) => join.source.name)];
+  return [...new Set([...direct, ...(query.with ?? []).flatMap((cte) => querySources(cte.query)), ...(query.union ?? []).flatMap((part) => querySources(part.query))])];
+}
+function resolveSource(runtime: EntityRuntime, tableName: string, apiVersion: string): { tableName: string; definition: EntityDefinition } {
+  const definitions = runtime.definitions(apiVersion);
+  const matches = definitions.filter((definition) => tableName === definition.name || tableName === `${definition.context?.namespace ?? ""}.${definition.name}`);
+  if (matches.length !== 1) throw new ValidationError(`Query source is not an unambiguous entity: ${tableName}`);
+  return { tableName, definition: matches[0] };
+}
+function publicRecords(runtime: EntityRuntime, definition: EntityDefinition): Record<string, unknown>[] {
+  const sensitive = new Set(Object.entries(definition.fields).filter(([, field]) => field.ui?.sensitive).map(([name]) => name));
+  return runtime.listRecords(definition.name, definition.context?.namespace).map((record) => Object.fromEntries(Object.entries(record).filter(([name]) => !sensitive.has(name))));
+}

@@ -86,6 +86,29 @@ test("installs view and menu catalogs and exposes a discoverable manifest", asyn
   });
 });
 
+test("executes a persisted ExensialQuery QueryView through its central endpoint", async () => {
+  await withApi(async (baseUrl) => {
+    const headers = { "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers, body: JSON.stringify({ name: "books", namespace: "library", definition: "type Book = { title: string; active: boolean }" }) });
+    await fetch(`${baseUrl}/v1/library/books`, { method: "POST", headers, body: JSON.stringify([{ title: "Available", active: true }, { title: "Archived", active: false }]) });
+    const source = {
+      language: "exensialquery",
+      ast: {
+        type: "select", from: { type: "table", name: "library.books", alias: "book" },
+        select: [{ expression: { type: "column", table: "book", name: "title" } }],
+        where: { type: "binary", operator: "=", left: { type: "column", table: "book", name: "active" }, right: { type: "parameter", name: "active" } }
+      }
+    };
+    assert.equal((await fetch(`${baseUrl}/v1/views`, { method: "POST", headers, body: JSON.stringify({ viewId: "Library_ActiveBooks_QueryView", kind: "query", name: "Active books", source }) })).status, 201);
+    const response = await fetch(`${baseUrl}/v1/views/Library_ActiveBooks_QueryView/data`, { method: "POST", headers, body: JSON.stringify({ parameters: { active: true } }) });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { viewId: "Library_ActiveBooks_QueryView", items: [{ title: "Available" }] });
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.equal(openapi["x-exensial-capabilities"].query.languages.exensialquery.availability, "named-views");
+    assert.ok(openapi.paths["/v1/views/{viewId}/data"].post);
+  });
+});
+
 test("returns correct errors for duplicate entities and invalid record routes", async () => {
   await withApi(async (baseUrl) => {
     const entity = { name: "tasks", definition: "type Task = { title: string }" };
