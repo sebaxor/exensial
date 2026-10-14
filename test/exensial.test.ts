@@ -323,6 +323,7 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /auth-form/);
     assert.match(consolePage, /className='account'/);
     assert.match(consolePage, /function enhanceConsole/);
+    assert.match(consolePage, /dialog instanceof HTMLDialogElement&&dialog\.open\)dialog\.close\(\)/);
   });
 });
 
