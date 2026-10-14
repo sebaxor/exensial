@@ -66,6 +66,8 @@ Optional technical capabilities are announced dynamically in OpenAPI. The curren
 
 The reusable [ExensialQuery package](packages/exensialquery/README.md) is a separate, dependency-free SQL-subset language: SQL ↔ portable AST ↔ an array executor. It is designed to be shared by browser and server adapters; it is not yet a replacement for the existing HTTP lookup capability.
 
+The proposed [Views and layered architecture](docs/views-and-layered-architecture-plan.md) defines the incremental path for query languages, installable layers, menu-driven views, and the reusable grid.
+
 [Runtime localization](docs/localization.md) is a system entity that can override generated OpenAPI and Console labels per language without redeploying entity code.
 
 [Entity versioning](docs/versioning.md) maps semantic entity versions to `/vN` routes and generates OpenAPI per major version.
