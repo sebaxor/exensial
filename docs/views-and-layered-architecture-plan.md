@@ -47,7 +47,7 @@ The intended package boundaries are deliberately narrow:
 | `exensial-core` | Runtime contracts, capability registry, HTTP-neutral primitives. | Shared capability descriptor types only. |
 | `exensial-entities` | Entity catalog, schema parsing, repositories, CRUD and default-view metadata. | Entity CRUD plugin. |
 | `exensial-security` | Authentication and authorization middleware, user/role/permission definitions. | Authentication and authorization console plugin. |
-| `exensial-views` | View catalog, manifest, named view data endpoints, query execution service. | Views/menu/grid plugin. |
+| `exensial-views` | View and menu catalogs, manifest, named view data endpoints, query execution service. | Views/menu/grid plugin. |
 | `exensial-console` | No backend behavior. | Small vanilla-JS shell and plugin registry. |
 
 The root `exensial` package remains a convenience composition for the existing application and labs. Packages are introduced one layer at a time; no independent package is published until it has its own tests, README, and built public API.
@@ -100,6 +100,7 @@ OpenAPI remains standards-compliant. Exensial uses an extension, never non-stand
     },
     "views": {
       "catalogPath": "/v1/views",
+      "menuCatalogPath": "/v1/menus",
       "manifestPath": "/v1/views/manifest",
       "dataPathTemplate": "/v1/views/{id}/data"
     }
@@ -131,15 +132,15 @@ The default compiler in `exensialquery` is portable SQL serialization. Database-
 
 Before execution, the Views layer validates that each referenced table maps to an entity, each referenced field is exposed/queryable, the caller is authorized for every source, parameters are supplied, and the AST is within configured complexity limits. This is required even for the in-memory adapter.
 
-## Views layer
+## Views and Menu layer
 
-`views` is a system entity, installed through the Entities layer in the same way as `users`, `roles`, or `localizations`. Its records are declarative and persisted. The Views layer observes its CRUD lifecycle to compile, validate, cache, and expose active view records.
+`views` and `menus` are system entities, installed through the Entities layer in the same way as `users`, `roles`, or `localizations`. Their records are declarative and persisted. The Views and Menu layer observes their CRUD lifecycle to compile, validate, cache, and expose the active view and menu records.
 
-The initial definition is intentionally compact:
+`View` has an opaque infrastructure `id`, as every Exensial entity does, and a stable user-defined `viewId`. Other configuration refers to `viewId`, never the persistence identifier. The initial definition is intentionally compact:
 
 ```ts
 type View = {
-  id: string;
+  viewId: string;
   kind: "query" | "detail";
   name: string;
   version?: string;
@@ -148,20 +149,31 @@ type View = {
     ast: json;
   };
   target?: { namespace?: string; entity: string; slot: "query" | "detail" };
-  menu?: {
-    parent?: string;
-    position?: number;
-    icon?: string;
-    visible?: boolean;
-  };
   columns?: json;
   fields?: json;
 };
 ```
 
+Menu placement is not embedded in a View. It is independently modeled, versioned, localized, and permission-protected:
+
+```ts
+type Menu = {
+  menuId: string;
+  parentId?: string;
+  position?: number;
+  visible: boolean;
+  icon?: string;
+  viewId: string;
+};
+```
+
+`parentId` references another `menuId`; root entries omit it. `position` is ascending, then `menuId` is the deterministic tie-breaker. `visible` controls presentation only: authorization remains mandatory at the view-data endpoint. A menu can point to an explicit persisted view or to a synthesized default CRUD view.
+
 ### QueryView
 
-A `QueryView` names a query source and tells the console how to render it. For the MVP its source language is `exensialquery`; `odata` is retained for simple entity lookup views, and `graphql` validation is rejected until an adapter is installed.
+A `QueryView` is both a data contract and an executable read model. Its source AST defines the fields, joins, filters, grouping, and aggregate shape returned by the central view-data endpoint. The backend validates and executes that AST through the configured query target adapter: in-memory repositories use the ExensialQuery array executor; a database adapter later compiles the exact same AST and binds it to its own SQL or non-SQL engine.
+
+For the MVP its source language is `exensialquery`; `odata` is retained for simple entity lookup views, and `graphql` validation is rejected until an adapter is installed.
 
 `columns` describes title, visibility, width, and aggregate intent. The server is still authoritative: sorting, filters, grouping, and aggregates are converted to an allowed AST extension and executed by the configured query adapter.
 
@@ -174,13 +186,13 @@ A `DetailView` initially lists declared fields in order. It is metadata only: no
 The Entities layer synthesizes implicit views for each entity:
 
 ```text
-<namespace>.<entity>:query
-<namespace>.<entity>:detail
+entity:<namespace>.<entity>:query
+entity:<namespace>.<entity>:detail
 ```
 
-An explicit view overrides a default only when its `target` exactly matches the entity and slot. The record `id` is human-selected; the recommended convention is `Library_Book_QueryView`, but matching never depends on a fragile string name. This avoids collisions between namespaces while satisfying the recognizable naming convention.
+An explicit view overrides a default only when its `target` exactly matches the entity and slot. The user-defined `viewId` is human-selected; the recommended convention is `Library_Book_QueryView`, but matching never depends on a fragile string name. This avoids collisions between namespaces while satisfying the recognizable naming convention.
 
-Menus are a projection of active query/detail/default views. `menu.parent`, `menu.position`, `menu.icon`, and `menu.visible` override inherited entity context. A hidden view remains callable only if separately authorized; it is never an authorization mechanism.
+The Views layer supplies default menu records in its manifest for synthesized CRUD query views. Explicit `menus` records override their parent, position, icon, and visibility. A hidden view remains callable only if separately authorized; it is never an authorization mechanism.
 
 ## Endpoints
 
@@ -189,13 +201,14 @@ The initial endpoints are:
 | Endpoint | Purpose |
 | --- | --- |
 | `/v1/views` and `/v1/views/{id}` | Standard CRUD for persisted view definitions. |
+| `/v1/menus` and `/v1/menus/{id}` | Standard CRUD for persisted menu definitions. |
 | `/v1/views/manifest` | One authorized, localized description of default and explicit views/menu entries. |
 | `/v1/views/{id}/data` | Executes a named QueryView. `POST` supplies safe parameter values and grid state. |
 | `/v1/views/{id}/record/{recordId}` | Retrieves the data required for a DetailView; initial version delegates to entity read. |
 | `/v1/query/odata/...` | OData-like ad-hoc read capability. |
 | `/v1/query/exensialquery` | Ad-hoc ExensialQuery AST execution, when explicitly enabled and authorized. |
 
-Named views are preferred for console navigation. Ad-hoc query endpoints exist for technical consumers and advanced lookup/grid interaction.
+Named views are the first implemented execution path. They are installed over REST (`POST /v1/views`) and then invoked through the central view-data endpoint, so they already satisfy the runtime-layer model. The ad-hoc query endpoint remains a future, explicitly opt-in technical capability rather than part of this MVP.
 
 ## Grid
 
@@ -221,7 +234,8 @@ The library installer will create its current entities plus:
 1. a `Library_Book_QueryView` with a compact book catalog projection and menu metadata;
 2. a `Library_ActiveLoan_QueryView` joining loans, books, and members through ExensialQuery;
 3. a primitive `Library_Book_DetailView`;
-4. localizations for every view, menu entry, grid label, and operation in English and Spanish.
+4. `menus` records that place the catalog and loan views in the Library group;
+5. localizations for every view, menu entry, grid label, and operation in English and Spanish.
 
 The lab documentation will show the exact `POST /v1/entities` and `POST /v1/views` payloads. No views or library behavior will be hardcoded in the application source.
 
@@ -229,7 +243,7 @@ The lab documentation will show the exact `POST /v1/entities` and `POST /v1/view
 
 1. **Foundation and contracts** — introduce the capability registry, layer installer contract, query-language registry, and package/build layout without changing external behavior.
 2. **Query service** — adapt existing OData under `odata`, add authenticated/authorized ExensialQuery AST execution, and implement the in-memory query target adapter. Preserve the old OData-like route as a documented alias.
-3. **Views backend** — install the `views` system entity, lifecycle validation, manifest, query/detail endpoints, OpenAPI extensions, localization, and authorization metadata.
+3. **Views backend** — install the `views` and `menus` system entities, lifecycle validation, manifest, query/detail endpoints, OpenAPI extensions, localization, and authorization metadata.
 4. **Console refactor** — split the current single generated console script into a small shell and layer plugins; introduce the reusable grid and use it first for default CRUD lists.
 5. **Views console and library lab** — render manifest-driven menus, view overrides, query/detail views, then parameterize the library lab and add its reproducible installer/documentation.
 6. **Package extraction and hardening** — finalize independent package READMEs, public API tests, migration notes, and remove deprecated compatibility code only in a later major version.
@@ -249,4 +263,4 @@ Every phase is independently testable and shippable. It must preserve existing C
 
 1. Preserve `/v1/query/exensial/...` indefinitely as a compatibility alias for the current OData-like behavior, or deprecate it immediately while keeping it only through the next major version?
 2. Should a user-created `QueryView` be able to reference and join any entity it is authorized to read, or initially only entities within its namespace? The plan recommends any authorized entity, because the library active-loan view needs cross-entity joins.
-3. Should ad-hoc `POST /v1/query/exensialquery` be available to any authorized API client, or should the first release expose ExensialQuery only through named persisted views? The plan recommends named views first and an explicitly opt-in ad-hoc endpoint for administrators.
+3. The first release executes named persisted views only. An ad-hoc `POST /v1/query/exensialquery` endpoint remains a later opt-in capability for administrative or technical clients.
