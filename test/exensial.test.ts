@@ -327,6 +327,8 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /installViewResources/);
     assert.match(consolePage, /view\.implicit\|\|view\.kind/);
     assert.match(consolePage, /\/v1\/views\/.*\/data/);
+    assert.match(consolePage, /entityPath\|\|item\.path/);
+    assert.match(consolePage, /target\.entityPath\|\|target\.path/);
     assert.match(consolePage, /function renderGrid/);
   });
 });
