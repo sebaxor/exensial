@@ -297,6 +297,10 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.equal(codeMirror.status, 200);
     assert.match(codeMirror.headers.get("content-type") ?? "", /^application\/javascript/);
     assert.match(await codeMirror.text(), /^\/\/ CodeMirror/);
+    const consoleModel = await fetch(`${baseUrl}/assets/console-model.js`);
+    assert.equal(consoleModel.status, 200);
+    assert.match(consoleModel.headers.get("content-type") ?? "", /^application\/javascript/);
+    assert.match(await consoleModel.text(), /export function mergeViewManifest/);
     assert.match(consolePage, /Runtime entity console/);
     assert.match(consolePage, /openapi\.json/);
     assert.match(consolePage, /exensial\.lastConsoleRoute/);
@@ -325,10 +329,10 @@ test("generates localized OpenAPI documentation from Exensial JSDoc metadata", a
     assert.match(consolePage, /function enhanceConsole/);
     assert.match(consolePage, /dialog instanceof HTMLDialogElement&&dialog\.open\)dialog\.close\(\)/);
     assert.match(consolePage, /installViewResources/);
-    assert.match(consolePage, /view\.implicit\|\|view\.kind/);
-    assert.match(consolePage, /\/v1\/views\/.*\/data/);
-    assert.match(consolePage, /entityPath\|\|item\.path/);
-    assert.match(consolePage, /target\.entityPath\|\|target\.path/);
+    assert.match(consolePage, /mergeViewManifest/);
+    assert.match(consolePage, /console-model\.js/);
+    assert.match(consolePage, /findRelationResource/);
+    assert.match(consolePage, /relationCollectionPath/);
     assert.match(consolePage, /function renderGrid/);
   });
 });

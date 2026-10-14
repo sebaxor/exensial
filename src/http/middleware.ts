@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { transpileModule, ModuleKind, ScriptTarget } from "typescript";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
 import { compileExensialFilter } from "../application/exensial-query";
 import { executeQueryView, queryViewSourcePaths, viewManifest } from "../application/views";
@@ -20,6 +22,7 @@ const consoleAssets: Record<string, { path: string; contentType: string }> = {
   "/assets/codemirror.js": { path: require.resolve("codemirror/lib/codemirror.js"), contentType: "application/javascript; charset=utf-8" },
   "/assets/codemirror-typescript.js": { path: require.resolve("codemirror/mode/javascript/javascript.js"), contentType: "application/javascript; charset=utf-8" }
 };
+const consoleModelPath = fileURLToPath(new URL("../ui/console-model.ts", import.meta.url));
 export type RequestContext = {
   request: IncomingMessage;
   response: ServerResponse;
@@ -77,6 +80,12 @@ export function documentationMiddleware(runtime: EntityRuntime, options: { exens
     }
     if (pathname === "/console") {
       context.domainResponse = { status: 200, headers: { "content-type": "text/html; charset=utf-8" }, body: consoleHtml() };
+      return;
+    }
+    if (pathname === "/assets/console-model.js") {
+      const source = await readFile(consoleModelPath, "utf8");
+      const body = transpileModule(source, { compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022 } }).outputText;
+      context.domainResponse = { status: 200, headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=3600" }, body };
       return;
     }
     const asset = consoleAssets[pathname];
