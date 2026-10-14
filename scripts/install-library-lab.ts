@@ -260,7 +260,7 @@ const domainErrorLocalizations = [
 
 async function resetLibrary(): Promise<void> {
   await signInIfPresent();
-  for (const entity of ["menus", "views"]) {
+  for (const entity of ["menus", "views", "useCases"]) {
     const records = await request("GET", `/v1/${entity}`) as Array<{ id: string }>;
     for (const record of records) await request("DELETE", `/v1/${entity}/${record.id}`);
   }
@@ -321,6 +321,24 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "books", version: "1.0.0", namespace: "library", group: "Library", icon: "book,📚", definition: booksDefinition, code: booksCode });
   await request("POST", "/v1/entities", { name: "members", version: "1.0.0", namespace: "library", group: "Library", icon: "users,👥", definition: membersDefinition, code: membersCode });
   await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", icon: "calendar,📅", definition: loansDefinition, code: loansCode });
+  await request("POST", "/v1/useCases", {
+    useCaseId: "Library_ReturnLoans", name: "Return selected loans",
+    route: { namespace: "library", entity: "loans", action: "return", method: "POST" },
+    inputs: [{ name: "loans", entity: "loans", namespace: "library", minItems: 1 }],
+    code: String.raw`export default async function ({ inputs, records, fail }) {
+  const returnedAt = new Date().toISOString();
+  const returned = [];
+  for (const loan of inputs.loans) {
+    if (loan.status !== "active") fail("library.loans.error.returnActiveLoan");
+    const book = records.get("books", loan.book, "library");
+    if (!book) fail("library.loans.error.bookUnavailable");
+    await records.update("books", book.id, { copiesAvailable: Number(book.copiesAvailable) + 1 }, "library");
+    await records.update("loans", loan.id, { status: "returned", returnedAt }, "library");
+    returned.push(loan.id);
+  }
+  return { returned };
+}`
+  });
   await request("POST", "/v1/views", [
     { viewId: "Library_Book_QueryView", kind: "query", name: "Library book catalog", target: { namespace: "library", entity: "books", slot: "query" }, columns: ["title", "author", "isbn", "copiesAvailable"], source: { language: "exensialquery", ast: { type: "select", from: { type: "table", name: "library.books", alias: "book" }, select: [{ expression: { type: "column", table: "book", name: "title" } }, { expression: { type: "column", table: "book", name: "author" } }, { expression: { type: "column", table: "book", name: "isbn" } }, { expression: { type: "column", table: "book", name: "copiesAvailable" } }] } } },
     { viewId: "Library_ActiveLoan_QueryView", kind: "query", name: "Active library loans", columns: ["title", "member", "dueAt"], source: { language: "exensialquery", ast: { type: "select", from: { type: "table", name: "library.loans", alias: "loan" }, joins: [{ type: "INNER", source: { type: "table", name: "library.books", alias: "book" }, on: { type: "binary", operator: "=", left: { type: "column", table: "loan", name: "book" }, right: { type: "column", table: "book", name: "id" } } }, { type: "INNER", source: { type: "table", name: "library.members", alias: "member" }, on: { type: "binary", operator: "=", left: { type: "column", table: "loan", name: "member" }, right: { type: "column", table: "member", name: "id" } } }], where: { type: "binary", operator: "=", left: { type: "column", table: "loan", name: "status" }, right: { type: "literal", value: "active" } }, select: [{ expression: { type: "column", table: "book", name: "title" } }, { expression: { type: "column", table: "member", name: "name" }, alias: "member" }, { expression: { type: "column", table: "loan", name: "dueAt" } }] } } },

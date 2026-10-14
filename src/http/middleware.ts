@@ -6,6 +6,7 @@ import { transpileModule, ModuleKind, ScriptTarget } from "typescript";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
 import { compileExensialFilter } from "../application/exensial-query";
 import { executeQueryView, queryViewSourcePaths, viewManifest } from "../application/views";
+import { executeUseCase, installedUseCases, routeForUseCase } from "../application/use-cases";
 import type { LocalizationEntry } from "../application/localization";
 import type { EntityRecord } from "../domain/entity";
 import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
@@ -71,7 +72,7 @@ export function documentationMiddleware(runtime: EntityRuntime, options: { exens
     const apiVersion = `v${Number(url.searchParams.get("version") ?? runtime.latestMajor())}`;
     const localizations = runtime.listRecords("localizations").map(({ locale, key, value }) => ({ locale, key, value })) as LocalizationEntry[];
     if (pathname === "/openapi.json") {
-      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(apiVersion), { ...options, language, localizations, permissions: options.security && runtime.has("permissions") ? runtime.listRecords("permissions") : [], roles: options.security && runtime.has("roles") ? runtime.listRecords("roles") : [] }) };
+      context.domainResponse = { status: 200, body: createOpenApi(runtime.definitions(apiVersion), { ...options, language, localizations, useCases: runtime.has("useCases") ? installedUseCases(runtime) : [], permissions: options.security && runtime.has("permissions") ? runtime.listRecords("permissions") : [], roles: options.security && runtime.has("roles") ? runtime.listRecords("roles") : [] }) };
       return;
     }
     if (pathname === "/docs") {
@@ -204,6 +205,21 @@ export function viewsMiddleware(runtime: EntityRuntime, enabled = true): Middlew
     if (!parameters || typeof parameters !== "object" || Array.isArray(parameters) || Object.values(parameters).some((value) => !["string", "number", "boolean"].includes(typeof value) && value !== null)) throw new ValidationError("QueryView parameters must be scalar values");
     const result = executeQueryView(runtime, viewId, parameters as Record<string, string | number | boolean | null>, apiVersion);
     context.domainResponse = { status: 200, body: { viewId: result.view.viewId, items: result.items } };
+  };
+}
+
+/** Executes persisted domain operations after resolving their declared record-ID inputs. */
+export function useCasesMiddleware(runtime: EntityRuntime, enabled = true): Middleware {
+  return async (context, next) => {
+    if (!enabled) return next();
+    const input = requireHttpInput(context);
+    const url = new URL(input.url, "http://localhost");
+    const useCase = installedUseCases(runtime).find((candidate) => routeForUseCase(candidate) === url.pathname);
+    if (!useCase) return next();
+    if (input.method !== "POST") throw new MethodNotAllowedError();
+    const value = parseJson(input.body ?? "");
+    const result = await executeUseCase(runtime, useCase, value, requestLanguage(context));
+    context.domainResponse = { status: 200, body: { useCaseId: useCase.useCaseId, result } };
   };
 }
 

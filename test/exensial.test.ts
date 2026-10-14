@@ -43,7 +43,7 @@ test("creates an entity from a TypeScript type and performs its CRUD", async () 
 test("bootstraps every system entity through the entity catalog", async () => {
   await withApi(async (baseUrl) => {
     const catalog = await (await fetch(`${baseUrl}/v1/entities?perPage=100`)).json() as Array<{ id: string; name: string; definition: string }>;
-    assert.deepEqual(new Set(catalog.map((item) => item.name)), new Set(["entities", "localizations", "requests", "responses", "roles", "users", "userRoles", "permissions", "views", "menus"]));
+    assert.deepEqual(new Set(catalog.map((item) => item.name)), new Set(["entities", "localizations", "requests", "responses", "roles", "users", "userRoles", "permissions", "views", "menus", "useCases"]));
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.components.schemas.users.properties.active.default, true);
     const catalogEntry = catalog.find((item) => item.name === "entities")!;
@@ -106,6 +106,22 @@ test("executes a persisted ExensialQuery QueryView through its central endpoint"
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi["x-exensial-capabilities"].query.languages.exensialquery.availability, "named-views");
     assert.ok(openapi.paths["/v1/views/{viewId}/data"].post);
+  });
+});
+
+test("installs and executes a runtime UseCase with resolved entity inputs", async () => {
+  await withApi(async (baseUrl) => {
+    const headers = { "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers, body: JSON.stringify({ name: "tasks", definition: "type Task = { title: string; done: boolean }" }) });
+    const task = await (await fetch(`${baseUrl}/v1/tasks`, { method: "POST", headers, body: JSON.stringify({ title: "Read", done: false }) })).json();
+    const definition = { useCaseId: "CompleteTasks", name: "Complete tasks", route: { entity: "tasks", action: "complete" }, inputs: [{ name: "tasks", entity: "tasks", minItems: 1 }], code: "export default async ({ inputs, records }) => { for (const task of inputs.tasks) await records.update('tasks', task.id, { done: true }); return { count: inputs.tasks.length }; }" };
+    assert.equal((await fetch(`${baseUrl}/v1/useCases`, { method: "POST", headers, body: JSON.stringify(definition) })).status, 201);
+    const response = await fetch(`${baseUrl}/v1/tasks/complete`, { method: "POST", headers, body: JSON.stringify({ inputs: { tasks: [task.id] } }) });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { useCaseId: "CompleteTasks", result: { count: 1 } });
+    assert.equal((await (await fetch(`${baseUrl}/v1/tasks/${task.id}`)).json()).done, true);
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.equal(openapi.paths["/v1/tasks/complete"].post["x-exensial-usecase"].useCaseId, "CompleteTasks");
   });
 });
 

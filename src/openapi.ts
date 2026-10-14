@@ -1,16 +1,17 @@
 import type { EntityDefinition, FieldDefinition, LocalizedText, ScalarType } from "./domain/entity";
 import { localizedValue, type LocalizationEntry } from "./application/localization";
+import { routeForUseCase, type UseCaseDefinition } from "./application/use-cases";
 
 type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
-export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; views?: boolean; permissions?: Array<Record<string, unknown>>; roles?: Array<Record<string, unknown>>; language?: string; localizations?: LocalizationEntry[]; }
+export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; views?: boolean; useCases?: UseCaseDefinition[]; permissions?: Array<Record<string, unknown>>; roles?: Array<Record<string, unknown>>; language?: string; localizations?: LocalizationEntry[]; }
 
 export function createOpenApi(definitions: EntityDefinition[], capabilities: OpenApiOptions = {}): Record<string, unknown> {
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
-  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...(capabilities.views ? [viewPaths(language)] : []), ...definitions.map((definition) => ({ ...entityPaths(definition, language, localizations), ...(capabilities.exensialQuery ? exensialQueryPaths(definition, language, localizations) : {}) })));
+  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...(capabilities.views ? [viewPaths(language)] : []), useCasePaths(capabilities.useCases ?? [], language), ...definitions.map((definition) => ({ ...entityPaths(definition, language, localizations), ...(capabilities.exensialQuery ? exensialQueryPaths(definition, language, localizations) : {}) })));
   if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? [], capabilities.roles ?? []);
   return {
     openapi: "3.0.4",
@@ -25,10 +26,21 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
     "x-exensial-capabilities": {
       ...(capabilities.security ? { security: { loginPath: "/v1/auth/login", scheme: "bearerAuth", description: "Operations with x-exensial-authorization require a matching JWT role." } } : {}),
       ...(capabilities.views ? { views: { catalogPath: "/v1/views", menuCatalogPath: "/v1/menus", manifestPath: "/v1/views/manifest", dataPathTemplate: "/v1/views/{viewId}/data" } } : {}),
+      ...(capabilities.useCases ? { useCases: { catalogPath: "/v1/useCases", execution: "POST routes declared by each use case" } } : {}),
       ...(capabilities.exensialQuery ? { query: { languages: { odata: { root: "/v1/query/odata", legacyRoots: ["/v1/query/exensial"], transport: "GET", description: exensialQueryText(language, localizations, "capability.description", { en: "Optional OData-like read capability. Supports $filter (contains, startswith, endswith, eq, ne, gt, ge, lt, le joined with and), $skip, and $top. Only fields annotated as searchable or filterable can be queried.", es: "Capacidad opcional de lectura similar a OData. Admite $filter (contains, startswith, endswith, eq, ne, gt, ge, lt y le unidos con and), $skip y $top. Solo se pueden consultar campos anotados como buscables o filtrables." }) }, exensialquery: { representation: "exensialquery-ast", transport: "POST", availability: "named-views" } }, exensialQuery: { root: "/v1/query/exensial", deprecated: true } } } : {}) },
     paths,
     components: { schemas, ...(capabilities.security ? { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT", description: "Obtain a token from POST /v1/auth/login and send it as Authorization: Bearer <token>. Endpoint permissions decide whether authentication is required." } } } : {}) }
   };
+}
+
+function useCasePaths(useCases: UseCaseDefinition[], language: string): Record<string, unknown> {
+  return Object.fromEntries(useCases.map((useCase) => [routeForUseCase(useCase), { post: {
+    tags: [language === "es" ? "Casos de uso" : "Use cases"], operationId: `execute${identifier(useCase.useCaseId)}`, summary: useCase.name,
+    description: language === "es" ? "Ejecuta un caso de uso instalado en tiempo de ejecución con listas de IDs de registros." : "Executes a runtime-installed use case with lists of record IDs.",
+    "x-exensial-usecase": { useCaseId: useCase.useCaseId, inputs: useCase.inputs },
+    requestBody: { required: true, content: jsonContent({ type: "object", required: ["inputs"], properties: { inputs: { type: "object", properties: Object.fromEntries(useCase.inputs.map((input) => [input.name, { type: "array", minItems: input.minItems, maxItems: input.maxItems, items: { type: "string" } }])) } } }, { inputs: Object.fromEntries(useCase.inputs.map((input) => [input.name, ["record-id"]])) }) },
+    responses: { 200: { description: language === "es" ? "Caso de uso ejecutado" : "Use case executed", content: jsonContent({ type: "object" }) }, 400: validationErrorResponse(), 404: errorResponse() }
+  } }]));
 }
 
 function viewPaths(language: string): Record<string, unknown> {

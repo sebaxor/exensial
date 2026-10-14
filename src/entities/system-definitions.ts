@@ -247,5 +247,27 @@ type Menu = {
    * @exensial.title es ID de vista */
   viewId: string;
 }`
+  },
+  {
+    name: "useCases", version: "1.0.0", group: "System", icon: "play,▶",
+    definition: String.raw`/**
+ * @exensial.title en Use cases
+ * @exensial.title es Casos de uso
+ * @exensial.description en Runtime business operations over typed entity record inputs.
+ * @exensial.description es Operaciones de negocio en tiempo de ejecución sobre entradas tipadas de registros de entidad.
+ */
+type UseCase = {
+  /** @exensial.ui.searchable */
+  useCaseId: string;
+  name: string;
+  /** @exensial.ui.tableHidden */
+  route: json;
+  /** @exensial.ui.tableHidden */
+  inputs: json;
+  /** @exensial.ui.control textarea
+   * @exensial.ui.codeLanguage typescript
+   * @exensial.ui.tableHidden */
+  code: string;
+}`
   }
 ];
