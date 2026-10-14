@@ -4,7 +4,7 @@ import { localizedValue, type LocalizationEntry } from "./application/localizati
 type Schema = Record<string, unknown>;
 
 /** Builds an OpenAPI document from the entities that are installed right now. */
-export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; permissions?: Array<Record<string, unknown>>; roles?: Array<Record<string, unknown>>; language?: string; localizations?: LocalizationEntry[]; }
+export interface OpenApiOptions { exensialQuery?: boolean; security?: boolean; views?: boolean; permissions?: Array<Record<string, unknown>>; roles?: Array<Record<string, unknown>>; language?: string; localizations?: LocalizationEntry[]; }
 
 export function createOpenApi(definitions: EntityDefinition[], capabilities: OpenApiOptions = {}): Record<string, unknown> {
   const language = capabilities.language ?? "en";
@@ -24,6 +24,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
     "x-exensial-ui-localization": Object.fromEntries(localizations.filter((entry) => entry.locale === language && entry.key.startsWith("ui.")).map((entry) => [entry.key, entry.value])),
     "x-exensial-capabilities": {
       ...(capabilities.security ? { security: { loginPath: "/v1/auth/login", scheme: "bearerAuth", description: "Operations with x-exensial-authorization require a matching JWT role." } } : {}),
+      ...(capabilities.views ? { views: { catalogPath: "/v1/views", menuCatalogPath: "/v1/menus", manifestPath: "/v1/views/manifest", dataPathTemplate: "/v1/views/{viewId}/data" } } : {}),
       ...(capabilities.exensialQuery ? {
       query: {
         exensialQuery: {

@@ -68,6 +68,8 @@ The reusable [ExensialQuery package](packages/exensialquery/README.md) is a sepa
 
 The proposed [Views and layered architecture](docs/views-and-layered-architecture-plan.md) defines the incremental path for query languages, installable layers, menu-driven views, and the reusable grid.
 
+The first installed [Views and Menus layer](docs/views.md) exposes persisted view and menu catalogs plus a discoverable manifest.
+
 [Runtime localization](docs/localization.md) is a system entity that can override generated OpenAPI and Console labels per language without redeploying entity code.
 
 [Entity versioning](docs/versioning.md) maps semantic entity versions to `/vN` routes and generates OpenAPI per major version.

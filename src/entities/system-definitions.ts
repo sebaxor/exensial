@@ -193,5 +193,59 @@ type EndpointPermission = {
    * @exensial.enum allow deny */
   decision: string;
 }`
+  },
+  {
+    name: "views", version: "1.0.0", group: "System", icon: "table,▦",
+    definition: String.raw`/**
+ * @exensial.title en Views
+ * @exensial.title es Vistas
+ * @exensial.description en Persisted query and detail views installed at runtime.
+ * @exensial.description es Vistas de consulta y detalle persistidas e instaladas en tiempo de ejecución.
+ */
+type View = {
+  /** @exensial.title en View ID
+   * @exensial.title es ID de vista
+   * @exensial.ui.searchable */
+  viewId: string;
+  /** @exensial.title en Kind
+   * @exensial.title es Tipo
+   * @exensial.enum query detail */
+  kind: string;
+  /** @exensial.title en Name
+   * @exensial.title es Nombre */
+  name: string;
+  /** @exensial.ui.tableHidden */
+  source?: json;
+  /** @exensial.ui.tableHidden */
+  target?: json;
+  /** @exensial.ui.tableHidden */
+  columns?: json;
+  /** @exensial.ui.tableHidden */
+  fields?: json;
+}`
+  },
+  {
+    name: "menus", version: "1.0.0", group: "System", icon: "menu,☰",
+    definition: String.raw`/**
+ * @exensial.title en Menus
+ * @exensial.title es Menús
+ * @exensial.description en Runtime menu entries that point to implicit or persisted views.
+ * @exensial.description es Opciones de menú en tiempo de ejecución que apuntan a vistas implícitas o persistidas.
+ */
+type Menu = {
+  /** @exensial.title en Menu ID
+   * @exensial.title es ID de menú
+   * @exensial.ui.searchable */
+  menuId: string;
+  parentId?: string;
+  /** @exensial.default 0 */
+  position?: number;
+  /** @exensial.default true */
+  visible: boolean;
+  icon?: string;
+  /** @exensial.title en View ID
+   * @exensial.title es ID de vista */
+  viewId: string;
+}`
   }
 ];

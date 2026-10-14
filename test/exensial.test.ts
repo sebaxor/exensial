@@ -43,7 +43,7 @@ test("creates an entity from a TypeScript type and performs its CRUD", async () 
 test("bootstraps every system entity through the entity catalog", async () => {
   await withApi(async (baseUrl) => {
     const catalog = await (await fetch(`${baseUrl}/v1/entities?perPage=100`)).json() as Array<{ id: string; name: string; definition: string }>;
-    assert.deepEqual(new Set(catalog.map((item) => item.name)), new Set(["entities", "localizations", "requests", "responses", "roles", "users", "userRoles", "permissions"]));
+    assert.deepEqual(new Set(catalog.map((item) => item.name)), new Set(["entities", "localizations", "requests", "responses", "roles", "users", "userRoles", "permissions", "views", "menus"]));
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.components.schemas.users.properties.active.default, true);
     const catalogEntry = catalog.find((item) => item.name === "entities")!;
@@ -59,6 +59,30 @@ test("bootstraps every system entity through the entity catalog", async () => {
     });
     assert.equal(created.status, 201);
     assert.equal((await created.json()).active, true);
+  });
+});
+
+test("installs view and menu catalogs and exposes a discoverable manifest", async () => {
+  await withApi(async (baseUrl) => {
+    const headers = { "content-type": "application/json" };
+    const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
+    assert.equal(openapi["x-exensial-capabilities"].views.catalogPath, "/v1/views");
+    assert.equal(openapi["x-exensial-capabilities"].views.menuCatalogPath, "/v1/menus");
+    assert.equal(openapi["x-exensial-capabilities"].views.manifestPath, "/v1/views/manifest");
+
+    await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers, body: JSON.stringify({ name: "books", namespace: "library", definition: "type Book = { title: string }" }) });
+    const view = await fetch(`${baseUrl}/v1/views`, { method: "POST", headers, body: JSON.stringify({
+      viewId: "Library_Book_QueryView", kind: "query", name: "Library books", target: { namespace: "library", entity: "books", slot: "query" }, source: { language: "exensialquery", ast: { type: "select" } }
+    }) });
+    assert.equal(view.status, 201);
+    const menu = await fetch(`${baseUrl}/v1/menus`, { method: "POST", headers, body: JSON.stringify({ menuId: "library.books", position: 10, visible: true, icon: "book,📚", viewId: "Library_Book_QueryView" }) });
+    assert.equal(menu.status, 201);
+
+    const manifest = await (await fetch(`${baseUrl}/v1/views/manifest`)).json();
+    const bookView = manifest.views.find((item: { viewId: string }) => item.viewId === "Library_Book_QueryView");
+    assert.equal(bookView.implicit, false);
+    assert.deepEqual(bookView.target, { namespace: "library", entity: "books", slot: "query" });
+    assert.deepEqual(manifest.menus.find((item: { menuId: string }) => item.menuId === "library.books"), { menuId: "library.books", position: 10, visible: true, icon: "book,📚", viewId: "Library_Book_QueryView" });
   });
 });
 

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
 import { compileExensialFilter } from "../application/exensial-query";
+import { viewManifest } from "../application/views";
 import type { LocalizationEntry } from "../application/localization";
 import type { EntityRecord } from "../domain/entity";
 import type { CrudAction, DomainRequest, PayloadPattern } from "../domain/request";
@@ -59,7 +60,7 @@ export function httpAdapterMiddleware(): Middleware {
 }
 
 /** Serves generated API documentation without coupling the domain runtime to HTTP. */
-export function documentationMiddleware(runtime: EntityRuntime, options: { exensialQuery?: boolean; security?: boolean } = {}): Middleware {
+export function documentationMiddleware(runtime: EntityRuntime, options: { exensialQuery?: boolean; security?: boolean; views?: boolean } = {}): Middleware {
   return async (context, next) => {
     const url = new URL(requireHttpInput(context).url, "http://localhost");
     const pathname = url.pathname;
@@ -168,6 +169,18 @@ export function exensialQueryMiddleware(runtime: EntityRuntime, enabled = true):
       headers: { "X-Total-Count": String(result.total), "X-Query-Skip": String(skip), "X-Query-Top": String(take) },
       body: result.items
     };
+  };
+}
+
+/** Exposes a single localized/discoverable manifest for installed Views and Menus. */
+export function viewsMiddleware(runtime: EntityRuntime, enabled = true): Middleware {
+  return async (context, next) => {
+    if (!enabled) return next();
+    const input = requireHttpInput(context);
+    const url = new URL(input.url, "http://localhost");
+    if (url.pathname !== "/v1/views/manifest") return next();
+    if (input.method !== "GET") throw new MethodNotAllowedError();
+    context.domainResponse = { status: 200, body: viewManifest(runtime, `v${Number(url.searchParams.get("version") ?? runtime.latestMajor())}`) };
   };
 }
 

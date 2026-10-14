@@ -3,13 +3,14 @@ import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
 import { createEntitiesModule, entityCatalogRecord, moduleFromRecord } from "./entities/entities";
 import { systemDefinitionRecords } from "./entities/system-definitions";
 import { bindSecurityLifecycle } from "./application/security";
-import { authenticationMiddleware, authorizationMiddleware, compose, documentationMiddleware, entityLifecycleMiddleware, exensialQueryMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware } from "./http/middleware";
+import { authenticationMiddleware, authorizationMiddleware, compose, documentationMiddleware, entityLifecycleMiddleware, exensialQueryMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware, viewsMiddleware } from "./http/middleware";
 
 export interface AppOptions {
   modules?: EntityModule[];
   enableEntityCatalog?: boolean;
   enableExensialQuery?: boolean;
   enableSecurity?: boolean;
+  enableViews?: boolean;
 }
 
 /** Creates the HTTP app with the system entity and any code-defined entity modules. */
@@ -17,11 +18,12 @@ export function createApp({
   modules = [],
   enableEntityCatalog = process.env.EXENSIAL_ENABLE_ENTITY_CATALOG !== "false",
   enableExensialQuery = process.env.EXENSIAL_ENABLE_EXENSIAL_QUERY !== "false",
-  enableSecurity = process.env.EXENSIAL_ENABLE_SECURITY !== "false"
+  enableSecurity = process.env.EXENSIAL_ENABLE_SECURITY !== "false",
+  enableViews = process.env.EXENSIAL_ENABLE_VIEWS !== "false"
 }: AppOptions = {}) {
   const runtime = new EntityRuntime();
   const binding = enableSecurity ? bindSecurityLifecycle : undefined;
-  const systemRecords = systemDefinitionRecords.filter((record) => enableSecurity || !["roles", "users", "userRoles", "permissions"].includes(record.name));
+  const systemRecords = systemDefinitionRecords.filter((record) => (enableSecurity || !["roles", "users", "userRoles", "permissions"].includes(record.name)) && (enableViews || !["views", "menus"].includes(record.name)));
   if (enableEntityCatalog) {
     runtime.install(createEntitiesModule(runtime, binding));
     runtime.seedRecord("entities", entityCatalogRecord);
@@ -36,9 +38,10 @@ export function createApp({
   for (const module of modules) runtime.install(module);
   const handle = compose([
     httpAdapterMiddleware(),
-    documentationMiddleware(runtime, { exensialQuery: enableExensialQuery, security: enableSecurity }),
+    documentationMiddleware(runtime, { exensialQuery: enableExensialQuery, security: enableSecurity, views: enableViews }),
     authenticationMiddleware(runtime, enableSecurity),
     authorizationMiddleware(runtime, enableSecurity),
+    viewsMiddleware(runtime, enableViews),
     exensialQueryMiddleware(runtime, enableExensialQuery),
     restPatternMiddleware(runtime),
     responseRepositoryMiddleware(runtime),
