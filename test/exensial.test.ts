@@ -114,7 +114,7 @@ test("installs and executes a runtime UseCase with resolved entity inputs", asyn
     const headers = { "content-type": "application/json" };
     await fetch(`${baseUrl}/v1/entities`, { method: "POST", headers, body: JSON.stringify({ name: "tasks", definition: "type Task = { title: string; done: boolean }" }) });
     const task = await (await fetch(`${baseUrl}/v1/tasks`, { method: "POST", headers, body: JSON.stringify({ title: "Read", done: false }) })).json();
-    const definition = { useCaseId: "CompleteTasks", name: "Complete tasks", route: { entity: "tasks", action: "complete" }, inputs: [{ name: "tasks", entity: "tasks", minItems: 1 }], parameters: [{ name: "note", required: true }], code: "export default async ({ inputs, parameters, records }) => { for (const task of inputs.tasks) await records.update('tasks', task.id, { done: true }); return { count: inputs.tasks.length, note: parameters.note }; }" };
+    const definition = { useCaseId: "CompleteTasks", name: "Complete tasks", route: { entity: "tasks", action: "complete" }, inputs: [{ name: "tasks", entity: "tasks", minItems: 1 }], parameters: [{ name: "note", required: true }], enableCondition: { all: [{ field: "done", equals: false }] }, code: "export default async ({ inputs, parameters, records }) => { for (const task of inputs.tasks) await records.update('tasks', task.id, { done: true }); return { count: inputs.tasks.length, note: parameters.note }; }" };
     assert.equal((await fetch(`${baseUrl}/v1/useCases`, { method: "POST", headers, body: JSON.stringify(definition) })).status, 201);
     const missingParameter = await fetch(`${baseUrl}/v1/tasks/complete`, { method: "POST", headers, body: JSON.stringify({ inputs: { tasks: [task.id] } }) });
     assert.equal(missingParameter.status, 400);
@@ -122,10 +122,12 @@ test("installs and executes a runtime UseCase with resolved entity inputs", asyn
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { useCaseId: "CompleteTasks", result: { count: 1, note: "done" } });
     assert.equal((await (await fetch(`${baseUrl}/v1/tasks/${task.id}`)).json()).done, true);
+    assert.equal((await fetch(`${baseUrl}/v1/tasks/complete`, { method: "POST", headers, body: JSON.stringify({ inputs: { tasks: [task.id] }, parameters: { note: "again" } }) })).status, 400);
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.paths["/v1/tasks/complete"].post["x-exensial-usecase"].useCaseId, "CompleteTasks");
     assert.equal(openapi.paths["/v1/tasks/complete"].post["x-exensial-usecase"].name, "Complete tasks");
     assert.equal(openapi.paths["/v1/tasks/complete"].post["x-exensial-usecase"].parameters[0].name, "note");
+    assert.deepEqual(openapi.paths["/v1/tasks/complete"].post["x-exensial-usecase"].enableCondition, definition.enableCondition);
   });
 });
 

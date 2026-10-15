@@ -326,6 +326,7 @@ async function install(): Promise<void> {
     route: { namespace: "library", entity: "loans", action: "return", method: "POST" },
     inputs: [{ name: "loans", entity: "loans", namespace: "library", minItems: 1 }],
     parameters: [{ name: "returnedAt", type: "string", control: "datetime", required: true }],
+    enableCondition: { all: [{ field: "status", equals: "active" }, { field: "returnedAt", empty: true }] },
     code: String.raw`export default async function ({ inputs, parameters, records, fail }) {
   const returnedAt = String(parameters.returnedAt || "");
   if (!returnedAt || Number.isNaN(Date.parse(returnedAt))) fail("library.loans.error.returnActiveLoan");

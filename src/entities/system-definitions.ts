@@ -268,6 +268,8 @@ type UseCase = {
   inputs: json;
   /** @exensial.ui.tableHidden */
   parameters?: json;
+  /** @exensial.ui.tableHidden */
+  enableCondition?: json;
   /** @exensial.ui.control textarea
    * @exensial.ui.codeLanguage typescript
    * @exensial.ui.tableHidden */

@@ -6,7 +6,8 @@ import type { EntityRecord } from "../domain/entity";
 
 export type UseCaseInput = { name: string; entity: string; namespace?: string; minItems?: number; maxItems?: number };
 export type UseCaseParameter = { name: string; type?: "string" | "number" | "boolean"; control?: "text" | "date" | "datetime" | "number" | "checkbox"; required?: boolean; default?: unknown };
-export type UseCaseDefinition = { useCaseId: string; name: string; description?: string; icon?: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; parameters?: UseCaseParameter[]; code: string };
+export type EnableCondition = { all?: Array<{ field: string; equals?: unknown; empty?: boolean }> };
+export type UseCaseDefinition = { useCaseId: string; name: string; description?: string; icon?: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; parameters?: UseCaseParameter[]; enableCondition?: EnableCondition; code: string };
 export type ResolvedInputs = Record<string, EntityRecord[]>;
 type UseCaseHandler = (context: { inputs: ResolvedInputs; parameters: Record<string, unknown>; records: ReturnType<typeof records>; fail: (message: string) => never }) => unknown | Promise<unknown>;
 
@@ -33,6 +34,7 @@ export async function executeUseCase(runtime: EntityRuntime, definition: UseCase
       if (!record) throw new EntityNotFoundError(`UseCase input ${input.name} contains an unknown record`);
       return record;
     });
+    if (definition.enableCondition && inputs[input.name].some((record) => !matchesEnableCondition(record, definition.enableCondition!))) throw new ValidationError("One or more selected records do not allow this operation");
   }
   const parameters = (value as { parameters?: unknown }).parameters ?? {};
   if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) throw new ValidationError("UseCase parameters must be an object");
@@ -43,12 +45,22 @@ export async function executeUseCase(runtime: EntityRuntime, definition: UseCase
 
 function normalize(record: EntityRecord): UseCaseDefinition {
   const route = record.route;
-  const inputs = record.inputs, parameters = record.parameters;
+  const inputs = record.inputs, parameters = record.parameters, enableCondition = record.enableCondition;
   if (typeof record.useCaseId !== "string" || typeof record.name !== "string" || typeof record.code !== "string" || !route || typeof route !== "object" || Array.isArray(route) || !Array.isArray(inputs)) throw new ValidationError("Invalid UseCase definition");
   const value = route as Record<string, unknown>;
   if (typeof value.entity !== "string" || typeof value.action !== "string" || (value.namespace !== undefined && typeof value.namespace !== "string") || (value.method !== undefined && String(value.method).toUpperCase() !== "POST")) throw new ValidationError("UseCase route must define entity, action, optional namespace, and POST method");
   if (parameters !== undefined && !Array.isArray(parameters)) throw new ValidationError("UseCase parameters must be an array");
-  return { useCaseId: record.useCaseId, name: record.name, ...(typeof record.description === "string" ? { description: record.description } : {}), ...(typeof record.icon === "string" ? { icon: record.icon } : {}), route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), ...(Array.isArray(parameters) ? { parameters: parameters.map(normalizeParameter) } : {}), code: record.code };
+  return { useCaseId: record.useCaseId, name: record.name, ...(typeof record.description === "string" ? { description: record.description } : {}), ...(typeof record.icon === "string" ? { icon: record.icon } : {}), route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), ...(Array.isArray(parameters) ? { parameters: parameters.map(normalizeParameter) } : {}), ...(enableCondition ? { enableCondition: normalizeEnableCondition(enableCondition) } : {}), code: record.code };
+}
+
+function normalizeEnableCondition(value: unknown): EnableCondition {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Array.isArray((value as Record<string, unknown>).all)) throw new ValidationError("UseCase enableCondition must contain an all array");
+  const all = (value as { all: unknown[] }).all.map((clause) => { if (!clause || typeof clause !== "object" || Array.isArray(clause) || typeof (clause as Record<string, unknown>).field !== "string") throw new ValidationError("UseCase enableCondition clauses require field"); const item = clause as Record<string, unknown>; return { field: String(item.field), ...(Object.hasOwn(item, "equals") ? { equals: item.equals } : {}), ...(typeof item.empty === "boolean" ? { empty: item.empty } : {}) }; });
+  return { all };
+}
+
+export function matchesEnableCondition(record: EntityRecord, condition?: EnableCondition): boolean {
+  return !condition?.all || condition.all.every((clause) => (clause.equals === undefined || record[clause.field] === clause.equals) && (clause.empty === undefined || (clause.empty ? record[clause.field] === undefined || record[clause.field] === null || record[clause.field] === "" : record[clause.field] !== undefined && record[clause.field] !== null && record[clause.field] !== "")));
 }
 
 function normalizeParameter(value: unknown): UseCaseParameter {
