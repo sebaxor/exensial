@@ -303,7 +303,7 @@ async function installPermissions(): Promise<void> {
     const username = member.email.split(".")[0];
     if (userId[username]) await request("PATCH", `/v1/library/members/${member.id}`, { user: userId[username] });
   }
-  const protectedPaths = ["/v1/library/members*", "/v1/library/loans*", "/v1/entities*", "/v1/localizations*", "/v1/requests*", "/v1/responses*", "/v1/roles*", "/v1/users*", "/v1/userRoles*", "/v1/permissions*", "/v1/views*", "/v1/menus*"];
+  const protectedPaths = ["/v1/library/members*", "/v1/library/loans*", "/v1/entities*", "/v1/localizations*", "/v1/requests*", "/v1/responses*", "/v1/roles*", "/v1/users*", "/v1/userRoles*", "/v1/permissions*", "/v1/useCases*", "/v1/views*", "/v1/menus*"];
   const permissions = [
     { role: roleId.anonymous, method: "GET", path: "/v1/library/books*", decision: "allow" },
     { role: roleId.anonymous, method: "GET", path: "/v1/query/exensial/library/books*", decision: "allow" },
