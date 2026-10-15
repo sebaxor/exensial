@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createConsoleResources, findRelationResource, mergeViewManifest, relationCollectionPath } from "../src/ui/console-model";
+import { acceptsGridResponse, createConsoleResources, findRelationResource, gridRenderState, mergeViewManifest, relationCollectionPath, withGridFilter } from "../src/ui/console-model";
 
 const operation = { tags: ["library.books"] };
 const document = {
@@ -34,4 +34,20 @@ test("console navigation respects generated resources and menu visibility overri
   const merged = mergeViewManifest(resources, { views: [], menus: [{ viewId: "entity:library.loans:query", visible: false }] });
   assert.equal(merged.some((resource) => resource.path === "/v1/library/loans"), false);
   assert.equal(merged.some((resource) => resource.path === "/v1/library/books"), true);
+});
+
+test("grid keeps its structural state when a server-side filter has no matches", () => {
+  assert.equal(gridRenderState(4), "records");
+  assert.equal(gridRenderState(0), "empty");
+});
+
+test("grid filters replace only their own field and keep independent filters", () => {
+  const initial = [{ field: "title", value: "left" }, { field: "author", value: "le guin" }];
+  assert.deepEqual(withGridFilter(initial, "title", { field: "title", value: "kindred" }), [{ field: "author", value: "le guin" }, { field: "title", value: "kindred" }]);
+  assert.deepEqual(withGridFilter(initial, "author"), [{ field: "title", value: "left" }]);
+});
+
+test("a delayed grid response cannot replace the latest response", () => {
+  assert.equal(acceptsGridResponse(8, 8), true);
+  assert.equal(acceptsGridResponse(7, 8), false);
 });

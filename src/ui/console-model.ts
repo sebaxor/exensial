@@ -51,6 +51,22 @@ export function relationCollectionPath(resource: ConsoleResource, pageSize = 25)
   return `${resource.entityPath ?? resource.path}?page=1&perPage=${pageSize}`;
 }
 
+/** Keeps a grid mounted even when a server-side query has no matching rows. */
+export function gridRenderState(recordCount: number): "records" | "empty" {
+  return recordCount > 0 ? "records" : "empty";
+}
+
+/** A newer request wins; delayed responses must never repaint stale data. */
+export function acceptsGridResponse(requestId: number, currentRequestId: number): boolean {
+  return requestId === currentRequestId;
+}
+
+/** Replaces a field filter without mutating the previous serializable query. */
+export function withGridFilter<T extends { field: string }>(filters: T[], field: string, filter?: T): T[] {
+  const next = filters.filter((item) => item.field !== field);
+  return filter ? [...next, filter] : next;
+}
+
 /** Merges persisted menu/view configuration over generated CRUD navigation. */
 export function mergeViewManifest(resources: ConsoleResource[], manifest: { views: View[]; menus?: Menu[] }): ConsoleResource[] {
   const next = [...resources];
