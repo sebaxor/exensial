@@ -37,7 +37,7 @@ function useCasePaths(useCases: UseCaseDefinition[], language: string): Record<s
   return Object.fromEntries(useCases.map((useCase) => [routeForUseCase(useCase), { post: {
     tags: [language === "es" ? "Casos de uso" : "Use cases"], operationId: `execute${identifier(useCase.useCaseId)}`, summary: useCase.name,
     description: language === "es" ? "Ejecuta un caso de uso instalado en tiempo de ejecución con listas de IDs de registros." : "Executes a runtime-installed use case with lists of record IDs.",
-    "x-exensial-usecase": { useCaseId: useCase.useCaseId, inputs: useCase.inputs },
+    "x-exensial-usecase": { useCaseId: useCase.useCaseId, icon: useCase.icon, inputs: useCase.inputs },
     requestBody: { required: true, content: jsonContent({ type: "object", required: ["inputs"], properties: { inputs: { type: "object", properties: Object.fromEntries(useCase.inputs.map((input) => [input.name, { type: "array", minItems: input.minItems, maxItems: input.maxItems, items: { type: "string" } }])) } } }, { inputs: Object.fromEntries(useCase.inputs.map((input) => [input.name, ["record-id"]])) }) },
     responses: { 200: { description: language === "es" ? "Caso de uso ejecutado" : "Use case executed", content: jsonContent({ type: "object" }) }, 400: validationErrorResponse(), 404: errorResponse() }
   } }]));

@@ -5,7 +5,7 @@ import { ValidationError, EntityNotFoundError } from "./entity-runtime";
 import type { EntityRecord } from "../domain/entity";
 
 export type UseCaseInput = { name: string; entity: string; namespace?: string; minItems?: number; maxItems?: number };
-export type UseCaseDefinition = { useCaseId: string; name: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; code: string };
+export type UseCaseDefinition = { useCaseId: string; name: string; icon?: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; code: string };
 export type ResolvedInputs = Record<string, EntityRecord[]>;
 type UseCaseHandler = (context: { inputs: ResolvedInputs; records: ReturnType<typeof records>; fail: (message: string) => never }) => unknown | Promise<unknown>;
 
@@ -43,7 +43,7 @@ function normalize(record: EntityRecord): UseCaseDefinition {
   if (typeof record.useCaseId !== "string" || typeof record.name !== "string" || typeof record.code !== "string" || !route || typeof route !== "object" || Array.isArray(route) || !Array.isArray(inputs)) throw new ValidationError("Invalid UseCase definition");
   const value = route as Record<string, unknown>;
   if (typeof value.entity !== "string" || typeof value.action !== "string" || (value.namespace !== undefined && typeof value.namespace !== "string") || (value.method !== undefined && String(value.method).toUpperCase() !== "POST")) throw new ValidationError("UseCase route must define entity, action, optional namespace, and POST method");
-  return { useCaseId: record.useCaseId, name: record.name, route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), code: record.code };
+  return { useCaseId: record.useCaseId, name: record.name, ...(typeof record.icon === "string" ? { icon: record.icon } : {}), route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), code: record.code };
 }
 
 function normalizeInput(value: unknown): UseCaseInput {

@@ -260,6 +260,7 @@ type UseCase = {
   /** @exensial.ui.searchable */
   useCaseId: string;
   name: string;
+  icon?: string;
   /** @exensial.ui.tableHidden */
   route: json;
   /** @exensial.ui.tableHidden */

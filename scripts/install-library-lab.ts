@@ -322,7 +322,7 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "members", version: "1.0.0", namespace: "library", group: "Library", icon: "users,👥", definition: membersDefinition, code: membersCode });
   await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", icon: "calendar,📅", definition: loansDefinition, code: loansCode });
   await request("POST", "/v1/useCases", {
-    useCaseId: "Library_ReturnLoans", name: "Return selected loans",
+    useCaseId: "Library_ReturnLoans", name: "Return selected loans", icon: "undo,↩",
     route: { namespace: "library", entity: "loans", action: "return", method: "POST" },
     inputs: [{ name: "loans", entity: "loans", namespace: "library", minItems: 1 }],
     code: String.raw`export default async function ({ inputs, records, fail }) {
