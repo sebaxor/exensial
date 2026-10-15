@@ -295,7 +295,7 @@ npm run lab:library
 npm run lab:library:permissions
 ```
 
-The installer also creates runtime `views` and `menus`: a book catalog QueryView, an active-loans QueryView that joins loans, books, and members, and a primitive book DetailView. The QueryViews keep the source record ID in their result while omitting it from the visible columns; this lets the generic grid reuse the same record actions and UseCases as the entity CRUD view. They are posted through the public Exensial endpoints, not compiled into the application.
+The installer also creates runtime `views` and `menus`: a book catalog QueryView, an active-loans QueryView that joins loans, books, and members, and a primitive book DetailView. They are posted through the public Exensial endpoints, not compiled into the application.
 
 Both commands reset the three library definitions, their localized labels, and their fixture records. The protected command additionally resets and recreates the lab's `roles`, `users`, and `permissions`; it first signs in as the existing admin when reinstalling an already protected instance.
 
