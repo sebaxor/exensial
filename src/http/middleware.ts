@@ -207,7 +207,7 @@ export function viewsMiddleware(runtime: EntityRuntime, enabled = true): Middlew
     const grid = (payload as { grid?: unknown }).grid;
     if (grid !== undefined && (!grid || typeof grid !== "object" || Array.isArray(grid))) throw new ValidationError("Grid query must be an object");
     const result = executeQueryView(runtime, viewId, parameters as Record<string, string | number | boolean | null>, apiVersion, grid as GridQuery | undefined);
-    context.domainResponse = { status: 200, headers: { "X-Total-Count": String(result.total) }, body: { viewId: result.view.viewId, items: result.items, total: result.total } };
+    context.domainResponse = { status: 200, headers: { "X-Total-Count": String(result.total) }, body: { viewId: result.view.viewId, items: result.items } };
   };
 }
 
