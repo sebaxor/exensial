@@ -7,6 +7,7 @@ import { EntityConflictError, EntityNotFoundError, type EntityRuntime, Validatio
 import { compileExensialFilter } from "../application/exensial-query";
 import { executeQueryView, queryViewSourcePaths, viewManifest } from "../application/views";
 import type { GridQuery } from "../application/grid-query";
+import { executeGridQuery } from "../application/grid-query";
 import { executeUseCase, installedUseCases, routeForUseCase } from "../application/use-cases";
 import type { LocalizationEntry } from "../application/localization";
 import type { EntityRecord } from "../domain/entity";
@@ -208,6 +209,27 @@ export function viewsMiddleware(runtime: EntityRuntime, enabled = true): Middlew
     if (grid !== undefined && (!grid || typeof grid !== "object" || Array.isArray(grid))) throw new ValidationError("Grid query must be an object");
     const result = executeQueryView(runtime, viewId, parameters as Record<string, string | number | boolean | null>, apiVersion, grid as GridQuery | undefined);
     context.domainResponse = { status: 200, headers: { "X-Total-Count": String(result.total) }, body: { viewId: result.view.viewId, items: result.items } };
+  };
+}
+
+/** Executes the same GridQuery contract over an entity collection. */
+export function gridMiddleware(runtime: EntityRuntime): Middleware {
+  return async (context, next) => {
+    const input = requireHttpInput(context), url = new URL(input.url, "http://localhost");
+    const match = url.pathname.match(/^\/v(\d+)\/grid\/(?:(\w[\w.-]*)\/)?(\w[\w-]*)$/);
+    if (!match) return next();
+    if (input.method !== "POST") throw new MethodNotAllowedError();
+    const [, major, namespace, entityName] = match, apiVersion = `v${major}`;
+    const entityPath = `/v${major}/${namespace ? `${namespace}/` : ""}${entityName}`;
+    if (runtime.has("permissions")) authorize(runtime, context.principal, "GET", entityPath);
+    const payload = input.body?.trim() ? parseJson(input.body) : {};
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new ValidationError("Grid query body must be an object");
+    const grid = (payload as { grid?: unknown }).grid;
+    if (grid !== undefined && (!grid || typeof grid !== "object" || Array.isArray(grid))) throw new ValidationError("Grid query must be an object");
+    const request: DomainRequest = { apiVersion, entityName, ...(namespace ? { namespace } : {}), action: "list", pagination: { page: 1, perPage: 100_000 } };
+    const rows = runtime.publicResult(request, runtime.listRecords(entityName, namespace)) as EntityRecord[];
+    const result = executeGridQuery(rows, grid as GridQuery | undefined);
+    context.domainResponse = { status: 200, headers: { "X-Total-Count": String(result.total) }, body: result.items };
   };
 }
 

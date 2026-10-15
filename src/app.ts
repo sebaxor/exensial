@@ -3,7 +3,7 @@ import { EntityRuntime, type EntityModule } from "./application/entity-runtime";
 import { createEntitiesModule, entityCatalogRecord, moduleFromRecord } from "./entities/entities";
 import { systemDefinitionRecords } from "./entities/system-definitions";
 import { bindSecurityLifecycle } from "./application/security";
-import { authenticationMiddleware, authorizationMiddleware, compose, documentationMiddleware, entityLifecycleMiddleware, exensialQueryMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware, useCasesMiddleware, viewsMiddleware } from "./http/middleware";
+import { authenticationMiddleware, authorizationMiddleware, compose, documentationMiddleware, entityLifecycleMiddleware, exensialQueryMiddleware, gridMiddleware, httpAdapterMiddleware, payloadPatternMiddleware, requestRepositoryMiddleware, responseRepositoryMiddleware, restPatternMiddleware, useCasesMiddleware, viewsMiddleware } from "./http/middleware";
 
 export interface AppOptions {
   modules?: EntityModule[];
@@ -45,6 +45,7 @@ export function createApp({
     authorizationMiddleware(runtime, enableSecurity),
     useCasesMiddleware(runtime, enableUseCases),
     viewsMiddleware(runtime, enableViews),
+    gridMiddleware(runtime),
     exensialQueryMiddleware(runtime, enableExensialQuery),
     restPatternMiddleware(runtime),
     responseRepositoryMiddleware(runtime),
