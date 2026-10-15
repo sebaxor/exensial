@@ -5,9 +5,10 @@ import { ValidationError, EntityNotFoundError } from "./entity-runtime";
 import type { EntityRecord } from "../domain/entity";
 
 export type UseCaseInput = { name: string; entity: string; namespace?: string; minItems?: number; maxItems?: number };
-export type UseCaseDefinition = { useCaseId: string; name: string; icon?: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; code: string };
+export type UseCaseParameter = { name: string; type?: "string" | "number" | "boolean"; control?: "text" | "date" | "datetime" | "number" | "checkbox"; required?: boolean; default?: unknown };
+export type UseCaseDefinition = { useCaseId: string; name: string; icon?: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; parameters?: UseCaseParameter[]; code: string };
 export type ResolvedInputs = Record<string, EntityRecord[]>;
-type UseCaseHandler = (context: { inputs: ResolvedInputs; records: ReturnType<typeof records>; fail: (message: string) => never }) => unknown | Promise<unknown>;
+type UseCaseHandler = (context: { inputs: ResolvedInputs; parameters: Record<string, unknown>; records: ReturnType<typeof records>; fail: (message: string) => never }) => unknown | Promise<unknown>;
 
 export function routeForUseCase(definition: UseCaseDefinition): string {
   return `/v1/${definition.route.namespace ? `${definition.route.namespace}/` : ""}${definition.route.entity}/${definition.route.action}`;
@@ -33,17 +34,27 @@ export async function executeUseCase(runtime: EntityRuntime, definition: UseCase
       return record;
     });
   }
+  const parameters = (value as { parameters?: unknown }).parameters ?? {};
+  if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) throw new ValidationError("UseCase parameters must be an object");
+  for (const parameter of definition.parameters ?? []) if (parameter.required && (parameters as Record<string, unknown>)[parameter.name] === undefined) throw new ValidationError(`UseCase parameter ${parameter.name} is required`);
   const handler = compile(definition.code);
-  return handler({ inputs, records: records(runtime), fail: (message: string) => { throw new ValidationError(runtime.localize(language, message, message)); } });
+  return handler({ inputs, parameters: parameters as Record<string, unknown>, records: records(runtime), fail: (message: string) => { throw new ValidationError(runtime.localize(language, message, message)); } });
 }
 
 function normalize(record: EntityRecord): UseCaseDefinition {
   const route = record.route;
-  const inputs = record.inputs;
+  const inputs = record.inputs, parameters = record.parameters;
   if (typeof record.useCaseId !== "string" || typeof record.name !== "string" || typeof record.code !== "string" || !route || typeof route !== "object" || Array.isArray(route) || !Array.isArray(inputs)) throw new ValidationError("Invalid UseCase definition");
   const value = route as Record<string, unknown>;
   if (typeof value.entity !== "string" || typeof value.action !== "string" || (value.namespace !== undefined && typeof value.namespace !== "string") || (value.method !== undefined && String(value.method).toUpperCase() !== "POST")) throw new ValidationError("UseCase route must define entity, action, optional namespace, and POST method");
-  return { useCaseId: record.useCaseId, name: record.name, ...(typeof record.icon === "string" ? { icon: record.icon } : {}), route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), code: record.code };
+  if (parameters !== undefined && !Array.isArray(parameters)) throw new ValidationError("UseCase parameters must be an array");
+  return { useCaseId: record.useCaseId, name: record.name, ...(typeof record.icon === "string" ? { icon: record.icon } : {}), route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), ...(Array.isArray(parameters) ? { parameters: parameters.map(normalizeParameter) } : {}), code: record.code };
+}
+
+function normalizeParameter(value: unknown): UseCaseParameter {
+  if (!value || typeof value !== "object" || Array.isArray(value) || typeof (value as Record<string, unknown>).name !== "string") throw new ValidationError("UseCase parameters require a name");
+  const parameter = value as Record<string, unknown>;
+  return { name: String(parameter.name), ...(typeof parameter.type === "string" ? { type: parameter.type as UseCaseParameter["type"] } : {}), ...(typeof parameter.control === "string" ? { control: parameter.control as UseCaseParameter["control"] } : {}), ...(typeof parameter.required === "boolean" ? { required: parameter.required } : {}), ...(Object.hasOwn(parameter, "default") ? { default: parameter.default } : {}) };
 }
 
 function normalizeInput(value: unknown): UseCaseInput {

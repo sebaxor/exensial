@@ -265,6 +265,8 @@ type UseCase = {
   route: json;
   /** @exensial.ui.tableHidden */
   inputs: json;
+  /** @exensial.ui.tableHidden */
+  parameters?: json;
   /** @exensial.ui.control textarea
    * @exensial.ui.codeLanguage typescript
    * @exensial.ui.tableHidden */

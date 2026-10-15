@@ -325,8 +325,10 @@ async function install(): Promise<void> {
     useCaseId: "Library_ReturnLoans", name: "Return selected loans", icon: "undo,↩",
     route: { namespace: "library", entity: "loans", action: "return", method: "POST" },
     inputs: [{ name: "loans", entity: "loans", namespace: "library", minItems: 1 }],
-    code: String.raw`export default async function ({ inputs, records, fail }) {
-  const returnedAt = new Date().toISOString();
+    parameters: [{ name: "returnedAt", type: "string", control: "datetime", required: true }],
+    code: String.raw`export default async function ({ inputs, parameters, records, fail }) {
+  const returnedAt = String(parameters.returnedAt || "");
+  if (!returnedAt || Number.isNaN(Date.parse(returnedAt))) fail("library.loans.error.returnActiveLoan");
   const returned = [];
   for (const loan of inputs.loans) {
     if (loan.status !== "active") fail("library.loans.error.returnActiveLoan");
