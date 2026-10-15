@@ -22,6 +22,6 @@ This produces `POST /v1/library/loans/return`. Its body is always shaped as list
 
 Before executing uploaded code, Exensial validates cardinality and resolves each ID to the declared entity. Runtime code receives `inputs` as records, a narrow `records.get/create/update` API, and `fail(message)`. It receives neither HTTP objects nor repositories.
 
-The generated OpenAPI operation carries `x-exensial-usecase`, including the UseCase ID and input contract. The Library lab installs `Library_ReturnLoans`; it returns one or many active loans, increments each book's available-copy count, and sets the loan status and return timestamp.
+The generated OpenAPI operation carries `x-exensial-usecase`, including the UseCase ID and input contract. The Library lab installs `Library_ReturnLoans`; it changes one or many active loans to `returned` and supplies the return timestamp. The loan entity's own update rule owns releasing the book copy, so the UseCase does not duplicate that infrastructure-adjacent invariant.
 
 Endpoint permissions remain backward-compatible in this MVP. The next migration makes generated CRUD operations first-class UseCases and lets authorization target UseCase IDs rather than HTTP path patterns. That requires migrating existing permission records and console authorization metadata together; it is intentionally not silently changed here.

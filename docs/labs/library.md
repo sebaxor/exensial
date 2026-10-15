@@ -261,10 +261,10 @@ export default {
   update: async (context, next) => {
     const loan = context.current, change = context.input;
     if (loan.status !== "active" || change.status !== "returned" || !isDate(change.returnedAt)) context.fail("library.loans.error.returnActiveLoan", "Only an active loan with a returned date may be returned");
-    await next();
     const books = context.collection("books", "library"), book = books.get(String(loan.book));
     const available = Number(book.copiesAvailable) + 1;
     if (available > Number(book.copiesTotal)) context.fail("library.loans.error.availableAboveTotal", "Available copies cannot exceed total copies");
+    await next();
     await books.update(book.id, { copiesAvailable: available });
   },
   delete: async (context, next) => { if (context.current.status === "active") context.fail("library.loans.error.activeCannotDelete", "Active loans cannot be deleted"); await next(); },
