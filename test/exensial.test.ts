@@ -122,6 +122,7 @@ test("installs and executes a runtime UseCase with resolved entity inputs", asyn
     assert.equal((await (await fetch(`${baseUrl}/v1/tasks/${task.id}`)).json()).done, true);
     const openapi = await (await fetch(`${baseUrl}/openapi.json`)).json();
     assert.equal(openapi.paths["/v1/tasks/complete"].post["x-exensial-usecase"].useCaseId, "CompleteTasks");
+    assert.equal(openapi.paths["/v1/tasks/complete"].post["x-exensial-usecase"].name, "Complete tasks");
   });
 });
 
