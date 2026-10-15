@@ -11,7 +11,7 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
   const language = capabilities.language ?? "en";
   const localizations = capabilities.localizations ?? [];
   const schemas = Object.fromEntries(definitions.map((definition) => [schemaKey(definition), entitySchema(definition, language, localizations)]));
-  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...(capabilities.views ? [viewPaths(language)] : []), useCasePaths(capabilities.useCases ?? [], language), ...definitions.map((definition) => ({ ...entityPaths(definition, language, localizations), ...(capabilities.exensialQuery ? exensialQueryPaths(definition, language, localizations) : {}) })));
+  const paths = Object.assign({}, ...(capabilities.security ? [authenticationPaths(language, localizations)] : []), ...(capabilities.views ? [viewPaths(language)] : []), useCasePaths(capabilities.useCases ?? [], language, localizations), ...definitions.map((definition) => ({ ...entityPaths(definition, language, localizations), ...(capabilities.exensialQuery ? exensialQueryPaths(definition, language, localizations) : {}) })));
   if (capabilities.security) applyAuthorizationMetadata(paths, capabilities.permissions ?? [], capabilities.roles ?? []);
   return {
     openapi: "3.0.4",
@@ -33,14 +33,14 @@ export function createOpenApi(definitions: EntityDefinition[], capabilities: Ope
   };
 }
 
-function useCasePaths(useCases: UseCaseDefinition[], language: string): Record<string, unknown> {
-  return Object.fromEntries(useCases.map((useCase) => [routeForUseCase(useCase), { post: {
-    tags: [language === "es" ? "Casos de uso" : "Use cases"], operationId: `execute${identifier(useCase.useCaseId)}`, summary: useCase.name,
-    description: language === "es" ? "Ejecuta un caso de uso instalado en tiempo de ejecución con listas de IDs de registros." : "Executes a runtime-installed use case with lists of record IDs.",
-    "x-exensial-usecase": { useCaseId: useCase.useCaseId, name: useCase.name, icon: useCase.icon, inputs: useCase.inputs, parameters: useCase.parameters ?? [] },
+function useCasePaths(useCases: UseCaseDefinition[], language: string, localizations: LocalizationEntry[]): Record<string, unknown> {
+  return Object.fromEntries(useCases.map((useCase) => { const name = localizedValue(localizations, language, `usecase.${useCase.useCaseId}.name`) ?? useCase.name; const description = localizedValue(localizations, language, `usecase.${useCase.useCaseId}.description`) ?? useCase.description ?? (language === "es" ? "Ejecuta un caso de uso instalado en tiempo de ejecución con listas de IDs de registros." : "Executes a runtime-installed use case with lists of record IDs."); return [routeForUseCase(useCase), { post: {
+    tags: [language === "es" ? "Casos de uso" : "Use cases"], operationId: `execute${identifier(useCase.useCaseId)}`, summary: name,
+    description,
+    "x-exensial-usecase": { useCaseId: useCase.useCaseId, name, description, icon: useCase.icon, inputs: useCase.inputs, parameters: useCase.parameters ?? [] },
     requestBody: { required: true, content: jsonContent({ type: "object", required: ["inputs"], properties: { inputs: { type: "object", properties: Object.fromEntries(useCase.inputs.map((input) => [input.name, { type: "array", minItems: input.minItems, maxItems: input.maxItems, items: { type: "string" } }])) }, parameters: { type: "object", properties: Object.fromEntries((useCase.parameters ?? []).map((parameter) => [parameter.name, { type: parameter.type ?? "string", default: parameter.default }])) } } }, { inputs: Object.fromEntries(useCase.inputs.map((input) => [input.name, ["record-id"]])), parameters: Object.fromEntries((useCase.parameters ?? []).filter((parameter) => parameter.default !== undefined).map((parameter) => [parameter.name, parameter.default])) }) },
     responses: { 200: { description: language === "es" ? "Caso de uso ejecutado" : "Use case executed", content: jsonContent({ type: "object" }) }, 400: validationErrorResponse(), 404: errorResponse() }
-  } }]));
+  } }]; }));
 }
 
 function viewPaths(language: string): Record<string, unknown> {

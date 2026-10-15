@@ -322,7 +322,7 @@ async function install(): Promise<void> {
   await request("POST", "/v1/entities", { name: "members", version: "1.0.0", namespace: "library", group: "Library", icon: "users,👥", definition: membersDefinition, code: membersCode });
   await request("POST", "/v1/entities", { name: "loans", version: "1.0.0", namespace: "library", group: "Library", icon: "calendar,📅", definition: loansDefinition, code: loansCode });
   await request("POST", "/v1/useCases", {
-    useCaseId: "Library_ReturnLoans", name: "Return selected loans", icon: "undo,↩",
+    useCaseId: "Library_ReturnLoans", name: "Return selected loans", description: "Returns active loans and releases their book copies.", icon: "undo,↩",
     route: { namespace: "library", entity: "loans", action: "return", method: "POST" },
     inputs: [{ name: "loans", entity: "loans", namespace: "library", minItems: 1 }],
     parameters: [{ name: "returnedAt", type: "string", control: "datetime", required: true }],
@@ -355,6 +355,8 @@ async function install(): Promise<void> {
       { locale: "en", key, value: english },
       { locale: "es", key, value: spanish }
     ]),
+    { locale: "es", key: "usecase.Library_ReturnLoans.name", value: "Devolver préstamos seleccionados" },
+    { locale: "es", key: "usecase.Library_ReturnLoans.description", value: "Devuelve préstamos activos y libera las copias de sus libros." },
     { locale: "es", key: "openapi.exensialQuery.capability.description", value: "Capacidad opcional de lectura similar a OData. Admite $filter (contains, startswith, endswith, eq, ne, gt, ge, lt y le unidos con and), $skip y $top. Solo se pueden consultar campos anotados como buscables o filtrables." },
     { locale: "es", key: "openapi.exensialQuery.description", value: "Usa la capacidad opcional ExensialQuery. Es un subconjunto seguro y de solo lectura similar a OData; en $filter solo se pueden usar campos anotados con @exensial.ui.searchable o @exensial.ui.filterable." },
     { locale: "es", key: "openapi.exensialQuery.filter.description", value: "Ejemplos: contains(title, 'Dune') o copiesAvailable gt 0. Las cláusulas se pueden unir con and." },

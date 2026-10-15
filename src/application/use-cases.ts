@@ -6,7 +6,7 @@ import type { EntityRecord } from "../domain/entity";
 
 export type UseCaseInput = { name: string; entity: string; namespace?: string; minItems?: number; maxItems?: number };
 export type UseCaseParameter = { name: string; type?: "string" | "number" | "boolean"; control?: "text" | "date" | "datetime" | "number" | "checkbox"; required?: boolean; default?: unknown };
-export type UseCaseDefinition = { useCaseId: string; name: string; icon?: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; parameters?: UseCaseParameter[]; code: string };
+export type UseCaseDefinition = { useCaseId: string; name: string; description?: string; icon?: string; route: { entity: string; namespace?: string; action: string; method?: string }; inputs: UseCaseInput[]; parameters?: UseCaseParameter[]; code: string };
 export type ResolvedInputs = Record<string, EntityRecord[]>;
 type UseCaseHandler = (context: { inputs: ResolvedInputs; parameters: Record<string, unknown>; records: ReturnType<typeof records>; fail: (message: string) => never }) => unknown | Promise<unknown>;
 
@@ -48,7 +48,7 @@ function normalize(record: EntityRecord): UseCaseDefinition {
   const value = route as Record<string, unknown>;
   if (typeof value.entity !== "string" || typeof value.action !== "string" || (value.namespace !== undefined && typeof value.namespace !== "string") || (value.method !== undefined && String(value.method).toUpperCase() !== "POST")) throw new ValidationError("UseCase route must define entity, action, optional namespace, and POST method");
   if (parameters !== undefined && !Array.isArray(parameters)) throw new ValidationError("UseCase parameters must be an array");
-  return { useCaseId: record.useCaseId, name: record.name, ...(typeof record.icon === "string" ? { icon: record.icon } : {}), route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), ...(Array.isArray(parameters) ? { parameters: parameters.map(normalizeParameter) } : {}), code: record.code };
+  return { useCaseId: record.useCaseId, name: record.name, ...(typeof record.description === "string" ? { description: record.description } : {}), ...(typeof record.icon === "string" ? { icon: record.icon } : {}), route: { entity: value.entity, action: value.action, ...(typeof value.namespace === "string" ? { namespace: value.namespace } : {}), method: "POST" }, inputs: inputs.map((input) => normalizeInput(input)), ...(Array.isArray(parameters) ? { parameters: parameters.map(normalizeParameter) } : {}), code: record.code };
 }
 
 function normalizeParameter(value: unknown): UseCaseParameter {
