@@ -6,6 +6,7 @@ import { transpileModule, ModuleKind, ScriptTarget } from "typescript";
 import { EntityConflictError, EntityNotFoundError, type EntityRuntime, ValidationError } from "../application/entity-runtime";
 import { compileExensialFilter } from "../application/exensial-query";
 import { executeQueryView, queryViewSourcePaths, viewManifest } from "../application/views";
+import type { GridQuery } from "../application/grid-query";
 import { executeUseCase, installedUseCases, routeForUseCase } from "../application/use-cases";
 import type { LocalizationEntry } from "../application/localization";
 import type { EntityRecord } from "../domain/entity";
@@ -203,8 +204,10 @@ export function viewsMiddleware(runtime: EntityRuntime, enabled = true): Middlew
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new ValidationError("QueryView parameters must be a JSON object");
     const parameters = (payload as { parameters?: unknown }).parameters ?? {};
     if (!parameters || typeof parameters !== "object" || Array.isArray(parameters) || Object.values(parameters).some((value) => !["string", "number", "boolean"].includes(typeof value) && value !== null)) throw new ValidationError("QueryView parameters must be scalar values");
-    const result = executeQueryView(runtime, viewId, parameters as Record<string, string | number | boolean | null>, apiVersion);
-    context.domainResponse = { status: 200, body: { viewId: result.view.viewId, items: result.items } };
+    const grid = (payload as { grid?: unknown }).grid;
+    if (grid !== undefined && (!grid || typeof grid !== "object" || Array.isArray(grid))) throw new ValidationError("Grid query must be an object");
+    const result = executeQueryView(runtime, viewId, parameters as Record<string, string | number | boolean | null>, apiVersion, grid as GridQuery | undefined);
+    context.domainResponse = { status: 200, headers: { "X-Total-Count": String(result.total) }, body: { viewId: result.view.viewId, items: result.items, total: result.total } };
   };
 }
 

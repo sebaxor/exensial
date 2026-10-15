@@ -2,6 +2,7 @@ import type { EntityDefinition, EntityRecord } from "../domain/entity";
 import type { EntityRuntime } from "./entity-runtime";
 import { execute, type Parameters, type SelectQuery, type Tables } from "../../packages/exensialquery/src/index";
 import { ValidationError } from "./entity-runtime";
+import { executeGridQuery, type GridQuery } from "./grid-query";
 
 export type ViewManifestEntry = {
   viewId: string;
@@ -41,7 +42,7 @@ export function viewManifest(runtime: EntityRuntime, apiVersion = `v${runtime.la
 }
 
 /** Executes a persisted ExensialQuery QueryView through the active repository target. */
-export function executeQueryView(runtime: EntityRuntime, viewId: string, parameters: Parameters = {}, apiVersion = `v${runtime.latestMajor()}`): { view: ViewManifestEntry; items: Record<string, unknown>[]; sources: EntityDefinition[] } {
+export function executeQueryView(runtime: EntityRuntime, viewId: string, parameters: Parameters = {}, apiVersion = `v${runtime.latestMajor()}`, grid?: GridQuery): { view: ViewManifestEntry; items: Record<string, unknown>[]; total: number; sources: EntityDefinition[] } {
   const view = viewManifest(runtime, apiVersion).views.find((item) => item.viewId === viewId);
   if (!view) throw new ValidationError("View not found");
   if (view.kind !== "query") throw new ValidationError("Only QueryViews can be executed");
@@ -51,7 +52,8 @@ export function executeQueryView(runtime: EntityRuntime, viewId: string, paramet
   const sources = querySources(ast).map((name) => resolveSource(runtime, name, apiVersion));
   const tables: Tables = {};
   for (const source of sources) tables[source.tableName] = publicRecords(runtime, source.definition);
-  return { view, items: execute(ast, tables, parameters), sources: sources.map((source) => source.definition) };
+  const result = executeGridQuery(execute(ast, tables, parameters), grid);
+  return { view, ...result, sources: sources.map((source) => source.definition) };
 }
 
 export function queryViewSourcePaths(runtime: EntityRuntime, viewId: string, apiVersion = `v${runtime.latestMajor()}`): string[] {
